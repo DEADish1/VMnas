@@ -12,6 +12,19 @@ BUILD_LOG="$DIST_DIR/build.log"
 
 mkdir -p "$DIST_DIR"
 
+if ! xcodebuild -version >/dev/null 2>&1; then
+  for developer_dir in \
+    "$HOME/Downloads/Xcode-beta.app/Contents/Developer" \
+    "/Applications/Xcode-beta.app/Contents/Developer" \
+    "/Applications/Xcode.app/Contents/Developer"
+  do
+    if [ -x "$developer_dir/usr/bin/xcodebuild" ]; then
+      export DEVELOPER_DIR="$developer_dir"
+      break
+    fi
+  done
+fi
+
 cd "$CLIENT_DIR"
 set +e
 swift build -c release >"$BUILD_LOG" 2>&1
@@ -49,5 +62,10 @@ find "$APP_DIR" -exec xattr -d com.apple.fileprovider.fpfs#P {} \; 2>/dev/null |
 find "$APP_DIR" -exec xattr -d com.apple.macl {} \; 2>/dev/null || true
 find "$APP_DIR" -exec xattr -d com.apple.provenance {} \; 2>/dev/null || true
 codesign --force --deep --no-strict --sign - "$APP_DIR"
+xattr -cr "$APP_DIR" 2>/dev/null || true
+find "$APP_DIR" -exec xattr -d com.apple.FinderInfo {} \; 2>/dev/null || true
+find "$APP_DIR" -exec xattr -d com.apple.fileprovider.fpfs#P {} \; 2>/dev/null || true
+find "$APP_DIR" -exec xattr -d com.apple.macl {} \; 2>/dev/null || true
+find "$APP_DIR" -exec xattr -d com.apple.provenance {} \; 2>/dev/null || true
 
 echo "$APP_DIR"
