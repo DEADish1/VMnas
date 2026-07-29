@@ -1,0 +1,13 @@
+.DS_Store
+dist/
+*.iso
+*.sha256
+__pycache__/
+*.pyc
+.venv/
+.build/
+.build-stale-*/
+bin/
+obj/
+*.log
+DerivedData/

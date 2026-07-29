@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+URL="${VMNAS_BENCHMARK_URL:-https://127.0.0.1:8765/host/benchmark/run}"
+
+for _ in $(seq 1 60); do
+  if curl -kfsS -X POST "${URL}" >/tmp/vmnas-benchmark.log 2>&1; then
+    exit 0
+  fi
+  sleep 5
+done
+
+cat /tmp/vmnas-benchmark.log >&2 2>/dev/null || true
+exit 1

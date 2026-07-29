@@ -1,0 +1,15 @@
+[Unit]
+Description=VMnas management agent
+After=network-online.target pveproxy.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/vmnas/server-agent
+ExecStartPre=/usr/local/sbin/vmnas-generate-cert
+ExecStart=/opt/vmnas/server-agent/.venv/bin/uvicorn vmnas_agent.main:app --host 0.0.0.0 --port 8765 --ssl-keyfile /var/lib/vmnas/certs/vmnas.key --ssl-certfile /var/lib/vmnas/certs/vmnas.crt
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

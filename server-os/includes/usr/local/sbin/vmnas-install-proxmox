@@ -1,0 +1,561 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "$(id -u)" -ne 0 ]]; then
+  echo "Run as root." >&2
+  exit 1
+fi
+
+PVE_CODENAME="${PVE_CODENAME:-trixie}"
+PROXMOX_KEYRING="proxmox-archive-keyring-${PVE_CODENAME}.gpg"
+PROXMOX_KEY_URL="https://enterprise.proxmox.com/debian/${PROXMOX_KEYRING}"
+HOSTNAME_VALUE="${VMNAS_HOSTNAME:-vmnas}"
+ADMIN_USER="${VMNAS_ADMIN_USER:-vmnas}"
+ADMIN_PASSWORD="${VMNAS_ADMIN_PASSWORD:-}"
+VMNAS_MODULES="${VMNAS_MODULES:-security-baseline,openmediavault,docker-engine,wireguard-local-vpn,transmission}"
+TARGET_DISK="${VMNAS_TARGET_DISK:-}"
+TARGET_ROOT="/mnt/vmnas-target"
+VMNAS_OS_SIZE_GB="${VMNAS_OS_SIZE_GB:-96}"
+VMNAS_MIN_OS_SIZE_GB="${VMNAS_MIN_OS_SIZE_GB:-64}"
+VMNAS_DATA_MOUNT="${VMNAS_DATA_MOUNT:-/var/lib/vmnas/data}"
+VMNAS_SELECTED_OS_SIZE_GB="${VMNAS_OS_SIZE_GB}"
+
+require_command() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "Missing required installer command: $1" >&2
+    exit 1
+  fi
+}
+
+on_error() {
+  local code="$?"
+  local line="${BASH_LINENO[0]:-unknown}"
+  echo
+  echo "VMnas installer failed at line ${line} with exit code ${code}." >&2
+  echo "If the code is 100, apt failed. Check the lines directly above for the missing package, bad repository, DNS issue, or GPG key problem." >&2
+  exit "${code}"
+}
+
+trap on_error ERR
+
+partition_path() {
+  local disk="$1"
+  local part="$2"
+  if [[ "${disk}" =~ (nvme|mmcblk) ]]; then
+    printf "%sp%s" "${disk}" "${part}"
+  else
+    printf "%s%s" "${disk}" "${part}"
+  fi
+}
+
+write_target_file() {
+  local path="$1"
+  install -d -m 0755 "$(dirname "${TARGET_ROOT}${path}")"
+  cat > "${TARGET_ROOT}${path}"
+}
+
+phase() {
+  echo "VMNAS_PHASE:$1"
+}
+
+primary_ipv4() {
+  ip -o -4 route get 1.1.1.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i == "src") {print $(i+1); exit}}'
+}
+
+run_in_target() {
+  chroot "${TARGET_ROOT}" /usr/bin/env DEBIAN_FRONTEND=noninteractive "$@"
+}
+
+apt_get_current() {
+  DEBIAN_FRONTEND=noninteractive apt-get \
+    -o Acquire::Retries=3 \
+    -o Dpkg::Options::=--force-confdef \
+    -o Dpkg::Options::=--force-confold \
+    "$@"
+}
+
+apt_get_target() {
+  run_in_target apt-get \
+    -o Acquire::Retries=3 \
+    -o Dpkg::Options::=--force-confdef \
+    -o Dpkg::Options::=--force-confold \
+    "$@"
+}
+
+set_admin_password_in_target() {
+  if [[ -n "${ADMIN_PASSWORD}" ]]; then
+    printf "%s:%s\n" "${ADMIN_USER}" "${ADMIN_PASSWORD}" | chroot "${TARGET_ROOT}" chpasswd
+  fi
+}
+
+set_admin_password_current() {
+  if [[ -n "${ADMIN_PASSWORD}" ]]; then
+    printf "%s:%s\n" "${ADMIN_USER}" "${ADMIN_PASSWORD}" | chpasswd
+  fi
+}
+
+harden_ssh_config() {
+  local root="$1"
+  install -d -m 0755 "${root}/etc/ssh/sshd_config.d"
+  cat > "${root}/etc/ssh/sshd_config.d/99-vmnas-hardening.conf" <<'EOF'
+PermitRootLogin no
+PermitEmptyPasswords no
+PasswordAuthentication yes
+PubkeyAuthentication yes
+X11Forwarding no
+EOF
+}
+
+mount_target_systems() {
+  mount --bind /dev "${TARGET_ROOT}/dev"
+  mount --bind /dev/pts "${TARGET_ROOT}/dev/pts"
+  mount -t proc proc "${TARGET_ROOT}/proc"
+  mount -t sysfs sys "${TARGET_ROOT}/sys"
+  mount -t efivarfs efivarfs "${TARGET_ROOT}/sys/firmware/efi/efivars" 2>/dev/null || true
+}
+
+unmount_target_systems() {
+  umount -lf "${TARGET_ROOT}/sys/firmware/efi/efivars" 2>/dev/null || true
+  umount -lf "${TARGET_ROOT}/sys" 2>/dev/null || true
+  umount -lf "${TARGET_ROOT}/proc" 2>/dev/null || true
+  umount -lf "${TARGET_ROOT}/dev/pts" 2>/dev/null || true
+  umount -lf "${TARGET_ROOT}/dev" 2>/dev/null || true
+}
+
+prepare_target_disk() {
+  if [[ -z "${TARGET_DISK}" ]]; then
+    echo "No target disk selected. Installing into the current running system."
+    return 1
+  fi
+  if [[ "${VMNAS_ERASE_CONFIRMED:-0}" != "1" ]]; then
+    echo "Refusing to erase ${TARGET_DISK} without confirmation." >&2
+    exit 1
+  fi
+  if [[ ! -b "${TARGET_DISK}" ]]; then
+    echo "Target disk is not a block device: ${TARGET_DISK}" >&2
+    exit 1
+  fi
+
+  require_command sgdisk
+  require_command partprobe
+  require_command mkfs.vfat
+  require_command mkfs.ext4
+  require_command debootstrap
+
+  local disk_bytes disk_gib os_size_gb data_size_gb
+  disk_bytes="$(blockdev --getsize64 "${TARGET_DISK}")"
+  disk_gib=$((disk_bytes / 1024 / 1024 / 1024))
+  if (( disk_gib < 80 )); then
+    echo "Target disk must be at least 80 GiB for VMnas OS, update overhead, and a data partition." >&2
+    exit 1
+  fi
+  os_size_gb="${VMNAS_OS_SIZE_GB}"
+  if (( disk_gib < os_size_gb + 24 )); then
+    os_size_gb="${VMNAS_MIN_OS_SIZE_GB}"
+  fi
+  if (( disk_gib < os_size_gb + 8 )); then
+    echo "Target disk is too small for a safe VMnas install. Need ${os_size_gb} GiB OS plus data overhead." >&2
+    exit 1
+  fi
+  VMNAS_SELECTED_OS_SIZE_GB="${os_size_gb}"
+  data_size_gb=$((disk_gib - os_size_gb - 1))
+
+  phase "Partitioning target disk"
+  echo "Preparing selected server drive ${TARGET_DISK} only. Other drives will not be formatted."
+  echo "Partition plan: 1 GiB EFI, ${os_size_gb} GiB VMnas OS, about ${data_size_gb} GiB VMNAS-DATA."
+  swapoff --all || true
+  umount -R "${TARGET_ROOT}" 2>/dev/null || true
+  wipefs -af "${TARGET_DISK}"
+  sgdisk --zap-all "${TARGET_DISK}"
+  sgdisk --clear \
+    --new=1:1MiB:+1024MiB --typecode=1:EF00 --change-name=1:"VMnas EFI" \
+    --new=2:0:+"${os_size_gb}"GiB --typecode=2:8300 --change-name=2:"VMnas Root" \
+    --new=3:0:0 --typecode=3:8300 --change-name=3:"VMnas Data" \
+    "${TARGET_DISK}"
+  partprobe "${TARGET_DISK}" || true
+  sleep 2
+
+  local efi_part root_part data_part
+  efi_part="$(partition_path "${TARGET_DISK}" 1)"
+  root_part="$(partition_path "${TARGET_DISK}" 2)"
+  data_part="$(partition_path "${TARGET_DISK}" 3)"
+
+  echo "Formatting selected server-drive partitions: ${efi_part}, ${root_part}, and ${data_part}"
+  mkfs.vfat -F32 -n VMNAS-EFI "${efi_part}"
+  mkfs.ext4 -F -L VMNAS-ROOT "${root_part}"
+  mkfs.ext4 -F -L VMNAS-DATA "${data_part}"
+
+  install -d -m 0755 "${TARGET_ROOT}"
+  mount "${root_part}" "${TARGET_ROOT}"
+  install -d -m 0755 "${TARGET_ROOT}/boot/efi"
+  mount "${efi_part}" "${TARGET_ROOT}/boot/efi"
+
+  phase "Installing Debian base"
+  echo "Installing Debian ${PVE_CODENAME} base"
+  debootstrap --arch=amd64 "${PVE_CODENAME}" "${TARGET_ROOT}" http://deb.debian.org/debian
+  return 0
+}
+
+configure_target_base() {
+  local root_part efi_part data_part root_uuid efi_uuid data_uuid host_ip
+  root_part="$(partition_path "${TARGET_DISK}" 2)"
+  efi_part="$(partition_path "${TARGET_DISK}" 1)"
+  data_part="$(partition_path "${TARGET_DISK}" 3)"
+  root_uuid="$(blkid -s UUID -o value "${root_part}")"
+  efi_uuid="$(blkid -s UUID -o value "${efi_part}")"
+  data_uuid="$(blkid -s UUID -o value "${data_part}")"
+  host_ip="$(primary_ipv4)"
+
+  echo "${HOSTNAME_VALUE}" > "${TARGET_ROOT}/etc/hostname"
+  cat > "${TARGET_ROOT}/etc/hosts" <<EOF
+127.0.0.1 localhost
+${host_ip:-127.0.1.1} ${HOSTNAME_VALUE} ${HOSTNAME_VALUE}.local pvelocalhost
+
+::1 localhost ip6-localhost ip6-loopback
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+EOF
+  cp -L /etc/resolv.conf "${TARGET_ROOT}/etc/resolv.conf" 2>/dev/null || true
+
+  cat > "${TARGET_ROOT}/etc/fstab" <<EOF
+UUID=${root_uuid} / ext4 defaults,noatime 0 1
+UUID=${efi_uuid} /boot/efi vfat umask=0077 0 1
+UUID=${data_uuid} ${VMNAS_DATA_MOUNT} ext4 defaults,noatime 0 2
+EOF
+  install -d -m 0755 "${TARGET_ROOT}${VMNAS_DATA_MOUNT}"
+
+  cat > "${TARGET_ROOT}/etc/apt/sources.list" <<EOF
+deb http://deb.debian.org/debian ${PVE_CODENAME} main contrib non-free-firmware
+deb http://deb.debian.org/debian ${PVE_CODENAME}-updates main contrib non-free-firmware
+deb http://security.debian.org/debian-security ${PVE_CODENAME}-security main contrib non-free-firmware
+EOF
+}
+
+copy_vmnas_assets_to_target() {
+  install -d -m 0755 "${TARGET_ROOT}/opt/vmnas"
+  install -d -m 0755 "${TARGET_ROOT}/usr/local/sbin"
+  install -d -m 0755 "${TARGET_ROOT}/etc/systemd/system"
+  cp -R /opt/vmnas/server-agent "${TARGET_ROOT}/opt/vmnas/server-agent"
+  cp /etc/systemd/system/vmnas-agent.service "${TARGET_ROOT}/etc/systemd/system/vmnas-agent.service"
+  cp /etc/systemd/system/vmnas-firstboot-info.service "${TARGET_ROOT}/etc/systemd/system/vmnas-firstboot-info.service"
+  cp /etc/systemd/system/vmnas-generate-cert.service "${TARGET_ROOT}/etc/systemd/system/vmnas-generate-cert.service"
+  cp /etc/systemd/system/vmnas-firewall.service "${TARGET_ROOT}/etc/systemd/system/vmnas-firewall.service"
+  cp /etc/systemd/system/vmnas-benchmark.service "${TARGET_ROOT}/etc/systemd/system/vmnas-benchmark.service"
+  install -d -m 0755 "${TARGET_ROOT}/etc/avahi/services"
+  cp /etc/avahi/services/vmnas.service "${TARGET_ROOT}/etc/avahi/services/vmnas.service" 2>/dev/null || true
+  cp /usr/local/sbin/vmnas-pairing-code "${TARGET_ROOT}/usr/local/sbin/vmnas-pairing-code"
+  cp /usr/local/sbin/vmnas-firstboot-info "${TARGET_ROOT}/usr/local/sbin/vmnas-firstboot-info"
+  cp /usr/local/sbin/vmnas-generate-cert "${TARGET_ROOT}/usr/local/sbin/vmnas-generate-cert"
+  cp /usr/local/sbin/vmnas-apply-firewall "${TARGET_ROOT}/usr/local/sbin/vmnas-apply-firewall"
+  cp /usr/local/sbin/vmnas-run-benchmark "${TARGET_ROOT}/usr/local/sbin/vmnas-run-benchmark"
+  cp /usr/local/sbin/vmnas-update "${TARGET_ROOT}/usr/local/sbin/vmnas-update"
+  cp /usr/local/sbin/vmnas-remote-update "${TARGET_ROOT}/usr/local/sbin/vmnas-remote-update"
+  chmod +x "${TARGET_ROOT}/usr/local/sbin/vmnas-pairing-code"
+  chmod +x "${TARGET_ROOT}/usr/local/sbin/vmnas-firstboot-info"
+  chmod +x "${TARGET_ROOT}/usr/local/sbin/vmnas-generate-cert"
+  chmod +x "${TARGET_ROOT}/usr/local/sbin/vmnas-apply-firewall"
+  chmod +x "${TARGET_ROOT}/usr/local/sbin/vmnas-run-benchmark"
+  chmod +x "${TARGET_ROOT}/usr/local/sbin/vmnas-update"
+  chmod +x "${TARGET_ROOT}/usr/local/sbin/vmnas-remote-update"
+}
+
+write_pairing_store() {
+  local root="$1"
+  install -d -m 0700 "${root}/var/lib/vmnas"
+  python3 - "${root}/var/lib/vmnas/pairing.json" <<'PY'
+import json
+import secrets
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+data = {"pin": secrets.randbelow(900000) + 100000, "devices": []}
+path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+path.chmod(0o600)
+print(f"Generated pairing PIN: {data['pin']}")
+PY
+}
+
+import_usb_iso_library() {
+  local root="$1"
+  local dest="${root}/var/lib/vmnas/isos"
+  local imported=0
+  install -d -m 0755 "${dest}"
+
+  copy_media_tree() {
+    local source_dir="$1"
+    [[ -d "${source_dir}" ]] || return 0
+    shopt -s nullglob
+    for media in "${source_dir}"/*.iso "${source_dir}"/*.img "${source_dir}"/*.img.bz2; do
+      echo "Importing USB install media: ${media}"
+      if [[ "${media}" == *.img.bz2 ]]; then
+        local output="${dest}/$(basename "${media%.bz2}")"
+        if [[ ! -e "${output}" ]]; then
+          bzip2 -dc "${media}" > "${output}"
+        fi
+      else
+        cp -n "${media}" "${dest}/"
+      fi
+      imported=$((imported + 1))
+    done
+    shopt -u nullglob
+  }
+
+  for source in \
+    /media/*/VMNAS_ISOS/isos \
+    /run/media/*/VMNAS_ISOS/isos \
+    /mnt/VMNAS_ISOS/isos \
+    /run/live/medium/VMNAS_ISOS/isos; do
+    copy_media_tree "${source}"
+  done
+
+  if [[ -e /dev/disk/by-label/VMNAS_ISOS ]]; then
+    local mount_dir="/tmp/vmnas-usb-isos"
+    mkdir -p "${mount_dir}"
+    if mount -o ro /dev/disk/by-label/VMNAS_ISOS "${mount_dir}" 2>/dev/null; then
+      copy_media_tree "${mount_dir}/isos"
+      umount "${mount_dir}" || true
+    fi
+  fi
+
+  if [[ "${imported}" -gt 0 ]]; then
+    echo "Imported ${imported} USB ISO(s) into ${dest}."
+  else
+    echo "No USB ISO library found."
+  fi
+}
+
+write_module_installer_script() {
+  local root="$1"
+  local script_path="${root}/tmp/vmnas-install-selected-modules.py"
+  cat > "${script_path}" <<'PY'
+import json
+import os
+import sys
+from pathlib import Path
+
+sys.path.insert(0, "/opt/vmnas/server-agent")
+
+from vmnas_agent.module_installers import INSTALLERS
+from vmnas_agent.store import CATALOG
+
+requested = [item.strip() for item in os.environ.get("VMNAS_MODULES", "").split(",") if item.strip()]
+catalog = {item["id"]: item for item in CATALOG}
+seen = set()
+ordered = []
+
+def add_with_dependencies(module_id):
+    if module_id in seen:
+        return
+    seen.add(module_id)
+    for dependency in catalog.get(module_id, {}).get("dependencies", []):
+        add_with_dependencies(dependency)
+    ordered.append(module_id)
+
+for module_id in requested:
+    add_with_dependencies(module_id)
+
+state_path = Path(os.environ.get("VMNAS_MODULE_STORE", "/var/lib/vmnas/modules.json"))
+state_path.parent.mkdir(parents=True, exist_ok=True)
+state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else {}
+
+for module_id in ordered:
+    installer = INSTALLERS.get(module_id)
+    if installer:
+        print(f"Installing VMnas module: {module_id}")
+        try:
+            installer()
+            state[module_id] = {"install_state": "installed", "progress": 100}
+        except Exception as exc:
+            print(f"Module {module_id} failed: {exc}", file=sys.stderr)
+            state[module_id] = {"install_state": "failed", "progress": 0}
+    else:
+        print(f"Staging VMnas module: {module_id}")
+        state[module_id] = {"install_state": "installed", "progress": 100}
+
+state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+state_path.chmod(0o600)
+PY
+}
+
+install_selected_modules_into_target() {
+  phase "Installing selected VMnas modules"
+  write_module_installer_script "${TARGET_ROOT}"
+  run_in_target /usr/bin/env VMNAS_MODULES="${VMNAS_MODULES}" VMNAS_MODULE_STORE="/var/lib/vmnas/modules.json" VMNAS_MODULE_ROOT="/opt/vmnas/modules" python3 /tmp/vmnas-install-selected-modules.py
+}
+
+install_selected_modules_current() {
+  phase "Installing selected VMnas modules"
+  write_module_installer_script ""
+  /usr/bin/env VMNAS_MODULES="${VMNAS_MODULES}" VMNAS_MODULE_STORE="/var/lib/vmnas/modules.json" VMNAS_MODULE_ROOT="/opt/vmnas/modules" python3 /tmp/vmnas-install-selected-modules.py
+}
+
+install_proxmox_into_target() {
+  phase "Installing Proxmox and VMnas services"
+  mount_target_systems
+  trap unmount_target_systems EXIT
+
+  apt_get_target update
+  apt_get_target install -y curl ca-certificates gnupg sudo openssh-server chrony open-iscsi postfix linux-image-amd64 grub-efi-amd64 grub-pc nftables openssl avahi-daemon
+
+  run_in_target install -d -m 0755 /etc/apt/keyrings
+  echo "Downloading Proxmox archive keyring from ${PROXMOX_KEY_URL}"
+  run_in_target curl -fsSL "${PROXMOX_KEY_URL}" \
+    -o "/etc/apt/keyrings/${PROXMOX_KEYRING}"
+
+  cat > "${TARGET_ROOT}/etc/apt/sources.list.d/proxmox.sources" <<EOF
+Types: deb
+URIs: http://download.proxmox.com/debian/pve
+Suites: ${PVE_CODENAME}
+Components: pve-no-subscription
+Signed-By: /etc/apt/keyrings/${PROXMOX_KEYRING}
+EOF
+
+  apt_get_target update
+  apt_get_target full-upgrade -y
+  apt_get_target install -y proxmox-ve zfsutils-linux python3 python3-venv python3-pip xorriso bzip2
+
+  if ! run_in_target id "${ADMIN_USER}" >/dev/null 2>&1; then
+    run_in_target adduser --disabled-password --gecos "" "${ADMIN_USER}"
+    run_in_target usermod -aG sudo "${ADMIN_USER}"
+  fi
+  set_admin_password_in_target
+  harden_ssh_config "${TARGET_ROOT}"
+
+  if grep -q '^GRUB_CMDLINE_LINUX_DEFAULT=' "${TARGET_ROOT}/etc/default/grub"; then
+    sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet amd_iommu=on intel_iommu=on iommu=pt"/' "${TARGET_ROOT}/etc/default/grub"
+  fi
+
+  cat > "${TARGET_ROOT}/etc/modules-load.d/vmnas-vfio.conf" <<'EOF'
+vfio
+vfio_iommu_type1
+vfio_pci
+vfio_virqfd
+EOF
+
+  copy_vmnas_assets_to_target
+  run_in_target python3 -m venv /opt/vmnas/server-agent/.venv
+  run_in_target /opt/vmnas/server-agent/.venv/bin/pip install --upgrade pip
+  run_in_target /opt/vmnas/server-agent/.venv/bin/pip install -r /opt/vmnas/server-agent/requirements.txt
+  run_in_target install -d -m 0700 /var/lib/vmnas
+  import_usb_iso_library "${TARGET_ROOT}"
+  install_selected_modules_into_target
+  run_in_target systemctl enable vmnas-agent.service
+  run_in_target systemctl enable vmnas-firstboot-info.service
+  run_in_target systemctl enable vmnas-generate-cert.service
+  run_in_target systemctl enable vmnas-firewall.service
+  run_in_target systemctl enable vmnas-benchmark.service
+  run_in_target systemctl enable avahi-daemon.service
+  write_pairing_store "${TARGET_ROOT}"
+
+  cat > "${TARGET_ROOT}/var/lib/vmnas/install-profile.json" <<EOF
+{
+  "hostname": "${HOSTNAME_VALUE}",
+  "admin_user": "${ADMIN_USER}",
+  "modules": "${VMNAS_MODULES}",
+  "os_partition_gb": "${VMNAS_SELECTED_OS_SIZE_GB}",
+  "data_mount": "${VMNAS_DATA_MOUNT}",
+  "nas_cpu_vcpus": "${VMNAS_NAS_CPU_VCPUS:-1}",
+  "nas_ram_gb": "${VMNAS_NAS_RAM_GB:-1}"
+}
+EOF
+
+  phase "Installing bootloader"
+  echo "Installing bootloader"
+  run_in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=VMnas --recheck || true
+  run_in_target grub-install --target=i386-pc "${TARGET_DISK}" --recheck || true
+  run_in_target update-grub
+  run_in_target update-initramfs -u -k all || true
+
+  unmount_target_systems
+  trap - EXIT
+}
+
+install_current_system_mode() {
+  phase "Installing Proxmox and VMnas services"
+  echo "${HOSTNAME_VALUE}" > /etc/hostname
+  hostnamectl set-hostname "${HOSTNAME_VALUE}" || true
+  host_ip="$(primary_ipv4)"
+  if ! grep -qE "[[:space:]]${HOSTNAME_VALUE}([[:space:]]|$)" /etc/hosts; then
+    printf "%s %s %s.local pvelocalhost\n" "${host_ip:-127.0.1.1}" "${HOSTNAME_VALUE}" "${HOSTNAME_VALUE}" >> /etc/hosts
+  fi
+
+  if ! id "${ADMIN_USER}" >/dev/null 2>&1; then
+    adduser --gecos "" "${ADMIN_USER}"
+    usermod -aG sudo "${ADMIN_USER}"
+  fi
+  set_admin_password_current
+  harden_ssh_config ""
+
+  apt_get_current update
+  apt_get_current install -y curl ca-certificates gnupg nftables openssl avahi-daemon
+
+  install -d -m 0755 /etc/apt/keyrings
+  echo "Downloading Proxmox archive keyring from ${PROXMOX_KEY_URL}"
+  curl -fsSL "${PROXMOX_KEY_URL}" \
+    -o "/etc/apt/keyrings/${PROXMOX_KEYRING}"
+
+  cat > /etc/apt/sources.list.d/proxmox.sources <<EOF
+Types: deb
+URIs: http://download.proxmox.com/debian/pve
+Suites: ${PVE_CODENAME}
+Components: pve-no-subscription
+Signed-By: /etc/apt/keyrings/${PROXMOX_KEYRING}
+EOF
+
+  apt_get_current update
+  apt_get_current full-upgrade -y
+  apt_get_current install -y proxmox-ve postfix open-iscsi chrony xorriso bzip2
+
+  if [[ -f /etc/default/grub ]]; then
+    if grep -q '^GRUB_CMDLINE_LINUX_DEFAULT=' /etc/default/grub; then
+      sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet amd_iommu=on intel_iommu=on iommu=pt"/' /etc/default/grub
+    fi
+    update-grub || true
+  fi
+
+  cat > /etc/modules-load.d/vmnas-vfio.conf <<'EOF'
+vfio
+vfio_iommu_type1
+vfio_pci
+vfio_virqfd
+EOF
+
+  python3 -m venv /opt/vmnas/server-agent/.venv
+  /opt/vmnas/server-agent/.venv/bin/pip install --upgrade pip
+  /opt/vmnas/server-agent/.venv/bin/pip install -r /opt/vmnas/server-agent/requirements.txt
+  install -d -m 0700 /var/lib/vmnas
+  import_usb_iso_library ""
+  install_selected_modules_current
+  systemctl enable vmnas-agent.service
+  systemctl enable vmnas-firstboot-info.service 2>/dev/null || true
+  systemctl enable vmnas-generate-cert.service 2>/dev/null || true
+  systemctl enable vmnas-firewall.service 2>/dev/null || true
+  systemctl enable vmnas-benchmark.service 2>/dev/null || true
+  systemctl enable avahi-daemon.service 2>/dev/null || true
+  write_pairing_store ""
+
+  cat > /var/lib/vmnas/install-profile.json <<EOF
+{
+  "hostname": "${HOSTNAME_VALUE}",
+  "admin_user": "${ADMIN_USER}",
+  "modules": "${VMNAS_MODULES}",
+  "nas_cpu_vcpus": "${VMNAS_NAS_CPU_VCPUS:-1}",
+  "nas_ram_gb": "${VMNAS_NAS_RAM_GB:-1}"
+}
+EOF
+}
+
+if prepare_target_disk; then
+  configure_target_base
+  install_proxmox_into_target
+  sync
+else
+  install_current_system_mode
+fi
+
+echo
+echo "VMnas server base is installed."
+echo "Reboot, then open https://SERVER-IP:8006 for Proxmox."
+echo "VMnas API will listen on https://SERVER-IP:8765 after reboot."
+echo "Use the Mac client pairing screen to pair this server."

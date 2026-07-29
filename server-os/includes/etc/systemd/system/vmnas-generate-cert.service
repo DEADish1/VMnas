@@ -1,0 +1,10 @@
+[Unit]
+Description=Generate VMnas HTTPS certificate
+Before=vmnas-agent.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/vmnas-generate-cert
+
+[Install]
+WantedBy=multi-user.target

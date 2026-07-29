@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PAIRING_STORE="${VMNAS_PAIRING_STORE:-/var/lib/vmnas/pairing.json}"
+PIN="not ready"
+IP_ADDR="$(hostname -I 2>/dev/null | awk '{print $1}')"
+
+if [[ -f "${PAIRING_STORE}" ]]; then
+  PIN="$(python3 - <<'PY'
+import json
+from pathlib import Path
+
+path = Path("/var/lib/vmnas/pairing.json")
+print(json.loads(path.read_text(encoding="utf-8")).get("pin", "not ready"))
+PY
+)"
+fi
+
+cat > /etc/issue <<EOF
+VMnas Server
+
+Web admin: https://${IP_ADDR:-SERVER-IP}:8006
+VMnas API: https://${IP_ADDR:-SERVER-IP}:8765
+Pairing PIN: ${PIN}
+
+Log in as the admin user created during install.
+
+EOF

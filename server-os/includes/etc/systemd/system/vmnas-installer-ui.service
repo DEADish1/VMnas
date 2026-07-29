@@ -1,0 +1,13 @@
+[Unit]
+Description=VMnas graphical installer UI
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/vmnas/installer-api/vmnas_installer_api.py
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

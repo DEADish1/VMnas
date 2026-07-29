@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+CERT_DIR="${VMNAS_CERT_DIR:-/var/lib/vmnas/certs}"
+HOSTNAME_VALUE="$(hostname -f 2>/dev/null || hostname)"
+IP_ADDR="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
+
+install -d -m 0700 "${CERT_DIR}"
+
+if [[ -f "${CERT_DIR}/vmnas.crt" && -f "${CERT_DIR}/vmnas.key" ]]; then
+  exit 0
+fi
+
+SAN="DNS:${HOSTNAME_VALUE},DNS:vmnas,DNS:vmnas.local"
+if [[ -n "${IP_ADDR}" ]]; then
+  SAN="${SAN},IP:${IP_ADDR}"
+fi
+
+openssl req -x509 -nodes -newkey rsa:4096 \
+  -keyout "${CERT_DIR}/vmnas.key" \
+  -out "${CERT_DIR}/vmnas.crt" \
+  -sha256 \
+  -days 825 \
+  -subj "/CN=${HOSTNAME_VALUE}" \
+  -addext "subjectAltName=${SAN}"
+
+chmod 0600 "${CERT_DIR}/vmnas.key"
+chmod 0644 "${CERT_DIR}/vmnas.crt"

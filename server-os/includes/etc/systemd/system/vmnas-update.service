@@ -1,0 +1,6 @@
+[Unit]
+Description=Check signed VMnas updates
+After=network-online.target
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/vmnas-update

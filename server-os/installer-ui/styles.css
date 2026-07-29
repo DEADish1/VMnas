@@ -1,0 +1,414 @@
+:root {
+  color-scheme: light;
+  --bg: #f4f6f8;
+  --panel: #ffffff;
+  --text: #17202a;
+  --muted: #687383;
+  --line: #d9dee6;
+  --accent: #2563eb;
+  --accent-dark: #1d4ed8;
+  --ok: #16803c;
+  --warn: #a15c00;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.sidebar {
+  padding: 22px;
+  background: #e9edf3;
+  border-right: 1px solid var(--line);
+}
+
+.brand {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 28px;
+}
+
+.mark {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  color: #fff;
+  font-weight: 800;
+  background: var(--accent);
+}
+
+h1, h2, h3, h4, p {
+  margin: 0;
+}
+
+.brand h1 {
+  font-size: 22px;
+}
+
+.brand p, .eyebrow, .card p, small, dd, .muted {
+  color: var(--muted);
+}
+
+nav {
+  display: grid;
+  gap: 8px;
+}
+
+button, input {
+  font: inherit;
+}
+
+.nav-item, .primary, .secondary {
+  min-height: 36px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.nav-item {
+  text-align: left;
+  padding: 8px 10px;
+  color: var(--text);
+  background: transparent;
+}
+
+.nav-item.active {
+  background: #fff;
+  border-color: var(--line);
+}
+
+.content {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 20px;
+  padding: 26px;
+}
+
+.topbar, footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+h2 {
+  font-size: 34px;
+  letter-spacing: 0;
+}
+
+.pill {
+  padding: 6px 10px;
+  border-radius: 999px;
+  color: var(--ok);
+  background: #dff5e7;
+  border: 1px solid #b7e5c7;
+}
+
+.step {
+  display: none;
+}
+
+.step.active {
+  display: block;
+}
+
+.hero {
+  margin-bottom: 18px;
+  padding: 22px;
+  border-radius: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+
+.hero h3 {
+  max-width: 880px;
+  font-size: 30px;
+  line-height: 1.15;
+  margin-bottom: 10px;
+}
+
+.hero p {
+  max-width: 900px;
+  line-height: 1.5;
+}
+
+.grid {
+  display: grid;
+  gap: 16px;
+}
+
+.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.card {
+  padding: 18px;
+  border-radius: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+
+.card h4 {
+  margin-bottom: 12px;
+  font-size: 17px;
+}
+
+.icon {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin-bottom: 14px;
+  border-radius: 8px;
+  color: #fff;
+  background: var(--accent);
+}
+
+dl {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+dt {
+  font-weight: 600;
+}
+
+label {
+  display: block;
+  margin: 12px 0 6px;
+  font-weight: 600;
+}
+
+output {
+  float: right;
+  color: var(--muted);
+}
+
+input[type="text"], input:not([type]) {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+
+input[type="range"] {
+  width: 100%;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.module-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 14px;
+}
+
+.disk-list {
+  display: grid;
+  gap: 10px;
+}
+
+.disk-option {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #fff;
+  cursor: pointer;
+}
+
+.disk-option.selected {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.disk-option.disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.disk-option input {
+  margin-right: 8px;
+}
+
+.disk-title {
+  font-weight: 700;
+}
+
+.warning {
+  color: var(--warn);
+}
+
+.phase-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 460px;
+  margin: 16px 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f0f4fa;
+}
+
+.module {
+  min-height: 112px;
+  padding: 16px;
+  border-radius: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.module.selected {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.module input {
+  margin-right: 8px;
+}
+
+.module span {
+  display: block;
+  margin: 8px 0 4px;
+  font-weight: 700;
+}
+
+.pair-card {
+  text-align: center;
+}
+
+.pair-code {
+  margin: 18px auto;
+  padding: 18px;
+  width: min(100%, 280px);
+  border-radius: 8px;
+  font-size: 42px;
+  letter-spacing: 6px;
+  background: #f0f4fa;
+  border: 1px solid var(--line);
+}
+
+.steps {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--muted);
+}
+
+.steps li {
+  margin: 10px 0;
+}
+
+.install-card {
+  max-width: 900px;
+}
+
+.failure-help {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 8px;
+  color: #7a271a;
+  background: #fde9e4;
+  border: 1px solid #f6c5ba;
+}
+
+.failure-help h5 {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+
+.report-path {
+  margin: 8px 0 0;
+  padding: 8px;
+  border-radius: 6px;
+  color: #184e36;
+  background: #e6f6ee;
+  border: 1px solid #aadfbe;
+  overflow-wrap: anywhere;
+}
+
+.hidden {
+  display: none;
+}
+
+pre {
+  min-height: 220px;
+  max-height: 360px;
+  overflow: auto;
+  margin: 16px 0 0;
+  padding: 14px;
+  color: #d9e8ff;
+  background: #111827;
+  border-radius: 8px;
+}
+
+.primary {
+  padding: 8px 14px;
+  color: #fff;
+  background: var(--accent);
+}
+
+.primary:hover {
+  background: var(--accent-dark);
+}
+
+.secondary {
+  padding: 8px 14px;
+  color: var(--text);
+  background: #fff;
+  border-color: var(--line);
+}
+
+@media (max-width: 860px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .two, .three {
+    grid-template-columns: 1fr;
+  }
+}
