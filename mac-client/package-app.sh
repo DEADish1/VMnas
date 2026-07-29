@@ -18,34 +18,18 @@ swift build -c release >"$BUILD_LOG" 2>&1
 BUILD_STATUS=$?
 set -e
 
+if [ "$BUILD_STATUS" -ne 0 ] || [ ! -x "$CLIENT_DIR/.build/release/VMnasAdmin" ]; then
+  echo "Fresh Swift build failed; see $BUILD_LOG" >&2
+  echo "Install the full Xcode toolchain, then rerun this script." >&2
+  exit "${BUILD_STATUS:-1}"
+fi
+
+BINARY="$CLIENT_DIR/.build/release/VMnasAdmin"
 if [ -d "$APP_DIR" ]; then
   mv "$APP_DIR" "$DIST_DIR/VMnas Admin-stale-$(date +%Y%m%d%H%M%S).app"
 fi
 
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
-if [ "$BUILD_STATUS" -eq 0 ] && [ -x "$CLIENT_DIR/.build/release/VMnasAdmin" ]; then
-  BINARY="$CLIENT_DIR/.build/release/VMnasAdmin"
-else
-  echo "Fresh Swift build failed; see $BUILD_LOG" >&2
-  echo "Looking for the newest previously built VMnasAdmin binary." >&2
-  BINARY="$(
-    find "$CLIENT_DIR" "/Applications/VMnas Admin.app/Contents/MacOS" \
-      -path '*/VMnasAdmin' \
-      -type f \
-      -perm +111 \
-      -print 2>/dev/null \
-      | while IFS= read -r path; do
-          printf '%s\t%s\n' "$(stat -f '%m' "$path")" "$path"
-        done \
-      | sort -nr \
-      | awk -F '\t' 'NR == 1 { print $2 }'
-  )"
-  if [ -z "$BINARY" ]; then
-    echo "No usable VMnasAdmin binary found. Install the full Xcode toolchain or restore a previous build." >&2
-    exit "$BUILD_STATUS"
-  fi
-fi
-
 echo "Packaging binary: $BINARY"
 ditto --norsrc "$BINARY" "$MACOS_DIR/VMnasAdmin"
 ditto --norsrc "$CLIENT_DIR/Packaging/Info.plist" "$APP_DIR/Contents/Info.plist"
