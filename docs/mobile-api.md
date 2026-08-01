@@ -22,6 +22,24 @@ Clients should support self-signed VMnas certificates after the user has paired 
 
 Pairing is done on the local network or from the server installer screen.
 
+VMnas pairing QR codes contain the same connection info a client needs to pair:
+
+```json
+{
+  "type": "vmnas-pairing",
+  "version": 1,
+  "server_name": "VMnas Server",
+  "api_url": "https://vmnas.local:8765",
+  "urls": ["https://vmnas.local:8765", "https://192.168.1.40:8765"],
+  "pin": "123456",
+  "pair_endpoint": "/pairing/pair",
+  "status_endpoint": "/pairing/status",
+  "discovery_endpoint": "/discovery"
+}
+```
+
+Clients should scan the QR code, choose the first reachable URL from `urls`, then submit `pin` to `pair_endpoint`.
+
 ```http
 POST /pairing/pair
 Content-Type: application/json

@@ -417,6 +417,8 @@ First version flow:
 4. Enter the pairing PIN.
 5. Click `Pair Device`.
 
+Pairing QR codes use a JSON payload with `type: "vmnas-pairing"`. The QR contains the server API URL, candidate local URLs, PIN, pairing endpoint, status endpoint, discovery endpoint, and payload version so iPhone, Android, Mac, and browser clients can scan once and pair without manually typing the server address.
+
 The server returns a long device token. The Mac client stores this token in macOS Keychain and sends it with admin requests. Once at least one device is paired, VMnas requires a valid paired-device token for server control endpoints.
 
 ## Remote Access

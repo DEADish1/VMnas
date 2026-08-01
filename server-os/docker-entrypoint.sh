@@ -91,6 +91,7 @@ pciutils
 python3
 python3-venv
 python3-pip
+qrencode
 rsync
 util-linux
 iproute2

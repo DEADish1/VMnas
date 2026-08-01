@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import json
 import os
 import secrets
 import subprocess
 import threading
+import urllib.parse
 from datetime import datetime
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -46,6 +49,54 @@ def ensure_pairing() -> dict:
     PAIRING_PATH.write_text(json.dumps(data, indent=2), encoding="utf-8")
     PAIRING_PATH.chmod(0o600)
     return data
+
+
+def detected_server_urls() -> list[str]:
+    urls = ["https://vmnas.local:8765"]
+    try:
+        result = subprocess.run(["hostname", "-I"], check=False, text=True, capture_output=True, timeout=4)
+        for address in result.stdout.split():
+            if ":" in address:
+                continue
+            url = f"https://{address}:8765"
+            if url not in urls:
+                urls.append(url)
+    except Exception:  # noqa: BLE001
+        pass
+    return urls
+
+
+def pairing_payload(pin: str) -> dict:
+    urls = detected_server_urls()
+    api_url = urls[0]
+    return {
+        "type": "vmnas-pairing",
+        "version": 1,
+        "server_name": "VMnas Server",
+        "api_url": api_url,
+        "urls": urls,
+        "pin": str(pin),
+        "pair_endpoint": "/pairing/pair",
+        "status_endpoint": "/pairing/status",
+        "discovery_endpoint": "/discovery",
+    }
+
+
+def pairing_qr_data_url(payload: dict) -> str:
+    message = json.dumps(payload, separators=(",", ":"))
+    try:
+        result = subprocess.run(
+            ["qrencode", "--type=SVG", "--output=-", message],
+            check=False,
+            text=True,
+            capture_output=True,
+            timeout=6,
+        )
+    except Exception:  # noqa: BLE001
+        return ""
+    if result.returncode != 0 or not result.stdout:
+        return ""
+    return "data:image/svg+xml," + urllib.parse.quote(result.stdout)
 
 
 def hardware() -> dict:
@@ -325,7 +376,9 @@ class Handler(SimpleHTTPRequestHandler):
             self.json_response(disks())
             return
         if self.path == "/api/pairing":
-            self.json_response({"pin": str(ensure_pairing()["pin"])})
+            pin = str(ensure_pairing()["pin"])
+            payload = pairing_payload(pin)
+            self.json_response({"pin": pin, "payload": payload, "qr_svg": pairing_qr_data_url(payload)})
             return
         if self.path == "/api/install/status":
             self.json_response(STATE)
@@ -337,7 +390,9 @@ class Handler(SimpleHTTPRequestHandler):
             data = ensure_pairing()
             data["pin"] = secrets.randbelow(900000) + 100000
             PAIRING_PATH.write_text(json.dumps(data, indent=2), encoding="utf-8")
-            self.json_response({"pin": str(data["pin"])})
+            pin = str(data["pin"])
+            payload = pairing_payload(pin)
+            self.json_response({"pin": pin, "payload": payload, "qr_svg": pairing_qr_data_url(payload)})
             return
         if self.path == "/api/install/start":
             if STATE["state"] == "running":

@@ -208,10 +208,28 @@ async function loadDisks() {
 async function loadPairing() {
   try {
     const pairing = await getJSON("/api/pairing");
-    document.querySelector("#pair-code").textContent = pairing.pin;
+    updatePairingView(pairing);
   } catch {
     document.querySelector("#pair-code").textContent = "------";
+    document.querySelector("#pair-qr").classList.add("hidden");
+    document.querySelector("#pair-url").textContent = "Pairing info is unavailable. Check installer logs.";
   }
+}
+
+function updatePairingView(pairing) {
+  document.querySelector("#pair-code").textContent = pairing.pin || "------";
+  const qr = document.querySelector("#pair-qr");
+  if (pairing.qr_svg) {
+    qr.src = pairing.qr_svg;
+    qr.classList.remove("hidden");
+  } else {
+    qr.removeAttribute("src");
+    qr.classList.add("hidden");
+  }
+  const payload = pairing.payload || {};
+  document.querySelector("#pair-url").textContent = payload.api_url
+    ? `QR includes ${payload.api_url}, pairing PIN, and VMnas pairing endpoints.`
+    : "QR includes the server address, pairing PIN, and VMnas pairing endpoints.";
 }
 
 async function pollInstall() {
@@ -260,7 +278,7 @@ nextButton.addEventListener("click", () => showStep(currentStep + 1));
 
 document.querySelector("#rotate-pin").addEventListener("click", async () => {
   const pairing = await postJSON("/api/pairing/rotate");
-  document.querySelector("#pair-code").textContent = pairing.pin;
+  updatePairingView(pairing);
 });
 
 installButton.addEventListener("click", async () => {

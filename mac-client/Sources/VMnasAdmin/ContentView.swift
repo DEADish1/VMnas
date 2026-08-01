@@ -1498,10 +1498,17 @@ struct ContentView: View {
     }
 
     private func pairingQRCode() -> NSImage? {
-        let payload = [
-            "server": api.serverBaseURL,
+        let baseURL = api.serverBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let payload: [String: Any] = [
+            "type": "vmnas-pairing",
+            "version": 1,
+            "server_name": "VMnas Server",
+            "api_url": baseURL,
+            "urls": [baseURL],
             "pin": api.latestPairingPin ?? pairingPin,
-            "type": "vmnas-pairing"
+            "pair_endpoint": "/pairing/pair",
+            "status_endpoint": "/pairing/status",
+            "discovery_endpoint": "/discovery"
         ]
         guard let data = try? JSONSerialization.data(withJSONObject: payload),
               let filter = CIFilter(name: "CIQRCodeGenerator")
