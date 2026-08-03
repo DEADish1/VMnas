@@ -23,7 +23,9 @@ lint:
 	python3 -m py_compile server-agent/vmnas_agent/*.py
 
 clean:
-	rm -rf mac-client/.build server-agent/.venv server-agent/vmnas_agent/__pycache__
+	rm -rf mac-client/.build mac-client/.build-stale-* server-agent/.venv server-agent/vmnas_agent/__pycache__ windows-client/bin windows-client/obj
+	rm -rf "dist/mac-client/VMnas Admin-stale-"*.app "mac-client 2" "server-os 2"
+	rm -f .DS_Store usb-write-*.log dist/mac-client/build.log
 	find server-agent -name '*.pyc' -delete
 
 clean-app-cache:

@@ -39,7 +39,7 @@ fi
 
 BINARY="$CLIENT_DIR/.build/release/VMnasAdmin"
 if [ -d "$APP_DIR" ]; then
-  mv "$APP_DIR" "$DIST_DIR/VMnas Admin-stale-$(date +%Y%m%d%H%M%S).app"
+  rm -rf "$APP_DIR"
 fi
 
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
