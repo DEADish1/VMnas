@@ -28,22 +28,27 @@ Optional:
 
 1. Boot from the VMnas USB installer.
 2. Wait for the graphical VMnas installer to open.
-3. Confirm detected CPU, RAM, network, and the selected server boot disk.
-4. Type `ERASE`.
+3. Click through the guided screens:
+   - Start
+   - Drive
+   - Admin
+   - Install
+4. Confirm the selected server drive. VMnas auto-selects the first usable install drive, but you can choose another one.
 5. Set the admin username and password.
-6. Leave the default starter modules selected unless you want to change them.
-7. Click `Install VMnas Server`.
-8. Reboot when prompted.
-9. On first boot, VMnas automatically brings up a Proxmox bridge named `vmbr0` using DHCP on the detected wired LAN interface.
-10. Read the server IP and pairing PIN from the console.
-11. Open VMnas Admin on the Mac.
-12. Scan the QR code or enter:
+6. Click `Install VMnas Server`.
+7. Reboot when prompted.
+8. On first boot, VMnas automatically brings up a Proxmox bridge named `vmbr0` using DHCP on the detected wired LAN interface.
+9. Read the server IP and pairing PIN from the console.
+10. Open VMnas Admin on the Mac.
+11. Scan the QR code or enter:
 
    ```text
    https://SERVER-IP:8765
    ```
 
-13. Pair with the displayed PIN.
+12. Pair with the displayed PIN.
+
+Advanced hardware, NAS resource, and starter module settings are available from the final Install screen, but the normal install path uses recommended defaults automatically.
 
 The installed server should not require manual shell network edits. If the console shows an unreachable address such as `10.0.2.15`, plug Ethernet directly into the home router/network and reinstall with the latest VMnas ISO so the installer can create the automatic DHCP bridge.
 

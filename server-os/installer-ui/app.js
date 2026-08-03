@@ -1,4 +1,4 @@
-const steps = ["welcome", "hardware", "storage", "account", "modules", "pair", "install"];
+const steps = ["welcome", "storage", "account", "install"];
 let currentStep = 0;
 
 const title = document.querySelector("#step-title");
@@ -30,6 +30,7 @@ function showStep(index) {
   title.textContent = stepName(id);
   backButton.disabled = currentStep === 0;
   nextButton.textContent = currentStep === steps.length - 1 ? "Review" : "Next";
+  updateReview();
 }
 
 function selectedModules() {
@@ -70,7 +71,7 @@ function installBlockedReason() {
   if (!detectedHardware) return "Waiting for hardware detection before install can start.";
   if (!selectedDisk || !selectedInput) return "Choose the server drive to install VMnas on.";
   if (selectedInput.dataset.installable !== "true") return "Choose an installable server drive.";
-  if (document.querySelector("#erase-confirmation").value.trim().toUpperCase() !== "ERASE") return "Type ERASE to confirm the selected server drive can be repartitioned.";
+  if (document.querySelector("#erase-confirmation").value.trim().toUpperCase() !== "ERASE") return "Confirm the selected server drive can be erased.";
   if (password.length < 8) return "Set an admin password with at least 8 characters.";
   if (password !== confirm) return "Confirm the admin password so both password fields match.";
   return "";
@@ -83,6 +84,18 @@ function updateInstallButton() {
   const warning = document.querySelector("#password-warning");
   warning.textContent = reason;
   warning.classList.toggle("hidden", ready || !reason);
+  updateReview();
+}
+
+function updateReview() {
+  const diskLabel = selectedDisk || "Choose a drive";
+  const adminUser = document.querySelector("#admin-user").value.trim() || "vmnas";
+  const password = document.querySelector("#admin-password").value;
+  const confirm = document.querySelector("#admin-password-confirm").value;
+  const network = detectedHardware && detectedHardware.network ? detectedHardware.network : "Checking";
+  document.querySelector("#review-drive").textContent = diskLabel;
+  document.querySelector("#review-admin").textContent = password.length >= 8 && password === confirm ? adminUser : "Set password";
+  document.querySelector("#review-network").textContent = network;
 }
 
 async function getJSON(path) {
@@ -189,20 +202,29 @@ async function loadDisks() {
     `;
     }).join("");
     document.querySelectorAll('input[name="target-disk"]').forEach((input) => {
-      input.addEventListener("change", () => {
-        selectedDisk = input.value;
-        document.querySelectorAll(".disk-option").forEach((option) => {
-          option.classList.toggle("selected", option.contains(input));
-        });
-        const disk = payload.disks.find((item) => item.path === selectedDisk);
-        const plan = disk && disk.plan ? disk.plan : {};
-        document.querySelector("#selected-disk-summary").textContent = `${selectedDisk} only will be repartitioned. Other drives are left untouched. VMnas will create a ${plan.os_gb || 96} GB OS partition and a ready ${plan.data_gb || 0} GB VMNAS-DATA partition.`;
-        updateInstallButton();
-      });
+      input.addEventListener("change", () => selectDisk(input.value, payload.disks));
     });
+    const firstInstallable = payload.disks.find((disk) => disk.plan && disk.plan.installable !== false);
+    if (firstInstallable) {
+      selectDisk(firstInstallable.path, payload.disks);
+    }
   } catch {
     list.innerHTML = "<p>Disk detection failed. Check installer logs.</p>";
   }
+}
+
+function selectDisk(path, disks) {
+  const input = Array.from(document.querySelectorAll('input[name="target-disk"]')).find((item) => item.value === path);
+  if (!input || input.disabled) return;
+  input.checked = true;
+  selectedDisk = input.value;
+  document.querySelectorAll(".disk-option").forEach((option) => {
+    option.classList.toggle("selected", option.contains(input));
+  });
+  const disk = disks.find((item) => item.path === selectedDisk);
+  const plan = disk && disk.plan ? disk.plan : {};
+  document.querySelector("#selected-disk-summary").textContent = `${selectedDisk} only will be repartitioned. Other drives are left untouched. VMnas will create a ${plan.os_gb || 96} GB OS partition and a ready ${plan.data_gb || 0} GB VMNAS-DATA partition.`;
+  updateInstallButton();
 }
 
 async function loadPairing() {
@@ -298,8 +320,13 @@ installButton.addEventListener("click", async () => {
 });
 
 document.querySelector("#erase-confirmation").addEventListener("input", updateInstallButton);
+document.querySelector("#erase-toggle").addEventListener("change", (event) => {
+  document.querySelector("#erase-confirmation").value = event.target.checked ? "ERASE" : "";
+  updateInstallButton();
+});
 document.querySelector("#admin-password").addEventListener("input", updateInstallButton);
 document.querySelector("#admin-password-confirm").addEventListener("input", updateInstallButton);
+document.querySelector("#admin-user").addEventListener("input", updateReview);
 
 rebootButton.addEventListener("click", () => {
   postJSON("/api/reboot").catch(() => {

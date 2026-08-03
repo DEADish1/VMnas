@@ -17,12 +17,9 @@
           </div>
         </div>
         <nav>
-          <button class="nav-item active" data-step="welcome">Overview</button>
-          <button class="nav-item" data-step="hardware">Hardware</button>
-          <button class="nav-item" data-step="storage">Storage</button>
+          <button class="nav-item active" data-step="welcome">Start</button>
+          <button class="nav-item" data-step="storage">Drive</button>
           <button class="nav-item" data-step="account">Admin</button>
-          <button class="nav-item" data-step="modules">Modules</button>
-          <button class="nav-item" data-step="pair">Pairing</button>
           <button class="nav-item" data-step="install">Install</button>
         </nav>
       </aside>
@@ -38,45 +35,24 @@
 
         <section class="step active" id="welcome">
           <div class="hero">
-            <h3>Simple server setup for VMs, NAS, containers, and remote control.</h3>
-            <p>VMnas installs the Proxmox-based server stack, prepares GPU passthrough support, enables the management agent, and creates a pairing code for your Mac, iPhone, Android device, or browser client.</p>
+            <h3>Install VMnas Server</h3>
+            <p>VMnas will check this computer, choose safe defaults, install the server stack, set up networking, and show a pairing code when it is ready.</p>
           </div>
           <div class="grid three">
             <article class="card">
               <span class="icon">1</span>
-              <h4>Install server</h4>
-              <p>Set hostname, admin user, virtualization options, and storage defaults.</p>
+              <h4>Pick the drive</h4>
+              <p>Only the selected server drive is erased. Other drives are left alone.</p>
             </article>
             <article class="card">
               <span class="icon">2</span>
-              <h4>Choose modules</h4>
-              <p>Add NAS, Docker, RTX passthrough, backup, monitoring, and remote access.</p>
+              <h4>Create admin</h4>
+              <p>Set the name and password you will use to manage the server.</p>
             </article>
             <article class="card">
               <span class="icon">3</span>
-              <h4>Pair devices</h4>
-              <p>Use a short PIN once, then manage everything from a paired client.</p>
-            </article>
-          </div>
-        </section>
-
-        <section class="step" id="hardware">
-          <div class="grid two">
-            <article class="card">
-              <h4>Detected Host</h4>
-              <dl id="hardware-list">
-                <div><dt>CPU</dt><dd>Checking...</dd></div>
-                <div><dt>Memory</dt><dd>Checking...</dd></div>
-                <div><dt>Network</dt><dd>Checking...</dd></div>
-              </dl>
-            </article>
-            <article class="card">
-              <h4>Resource Defaults</h4>
-              <label>NAS CPU <output id="cpu-out">1 vCPU</output></label>
-              <input id="nas-cpu" type="range" min="1" max="1" value="1" step="1">
-              <label>NAS RAM <output id="ram-out">1 GB</output></label>
-              <input id="nas-ram" type="range" min="1" max="1" value="1" step="1">
-              <label class="check"><input id="enable-iommu" type="checkbox" checked> Enable IOMMU and VFIO support</label>
+              <h4>Let it install</h4>
+              <p>The installer handles partitions, Proxmox, modules, networking, and pairing.</p>
             </article>
           </div>
         </section>
@@ -84,17 +60,17 @@
         <section class="step" id="storage">
           <div class="grid two">
             <article class="card">
-              <h4>Install Target</h4>
+              <h4>Choose Install Drive</h4>
               <div id="disk-list" class="disk-list">
                 <p>Checking disks...</p>
               </div>
             </article>
             <article class="card">
-              <h4>Erase Confirmation</h4>
+              <h4>Confirm</h4>
               <p class="warning">Only the selected server drive will be repartitioned. Existing data on that selected drive will be erased; other drives are left untouched.</p>
-              <p>VMnas creates a 1 GB EFI partition, a right-sized VMnas OS partition with update overhead, and a formatted VMNAS-DATA partition from the remaining space.</p>
-              <label>Type ERASE to continue</label>
-              <input id="erase-confirmation" placeholder="ERASE">
+              <p>VMnas creates the boot partition, the VMnas server partition, and a ready VMNAS-DATA partition automatically.</p>
+              <label class="check confirm-check"><input id="erase-toggle" type="checkbox"> I understand the selected drive will be erased</label>
+              <input id="erase-confirmation" class="hidden" value="">
               <p id="selected-disk-summary" class="muted">No disk selected.</p>
             </article>
           </div>
@@ -103,7 +79,7 @@
         <section class="step" id="account">
           <div class="grid two">
             <article class="card form">
-              <h4>Server Identity</h4>
+              <h4>Create Admin</h4>
               <label>Server name</label>
               <input id="hostname" value="vmnas">
               <label>Admin user</label>
@@ -116,45 +92,11 @@
               <input id="timezone" value="America/New_York">
             </article>
             <article class="card">
-              <h4>Access</h4>
+              <h4>Recommended Access</h4>
+              <p>These are enabled automatically so the Mac, phone, and browser clients can pair and manage the server.</p>
               <label class="check"><input id="enable-ssh" type="checkbox" checked> Enable SSH</label>
               <label class="check"><input id="enable-web" type="checkbox" checked> Enable web admin</label>
               <label class="check"><input id="auto-updates" type="checkbox" checked> Check for updates</label>
-            </article>
-          </div>
-        </section>
-
-        <section class="step" id="modules">
-          <div class="module-grid">
-            <label class="module selected"><input type="checkbox" value="security-baseline" checked> <span>Security Baseline</span><small>Firewall and safer defaults</small></label>
-            <label class="module selected"><input type="checkbox" value="openmediavault" checked> <span>OpenMediaVault NAS</span><small>NAS, VPN, and storage defaults</small></label>
-            <label class="module selected"><input type="checkbox" value="docker-engine" checked> <span>Docker Engine</span><small>Container runtime</small></label>
-            <label class="module selected"><input type="checkbox" value="wireguard-local-vpn" checked> <span>WireGuard VPN</span><small>Secure remote NAS access</small></label>
-            <label class="module selected"><input type="checkbox" value="transmission" checked> <span>Transmission</span><small>NAS BitTorrent client</small></label>
-            <label class="module"><input type="checkbox" value="docker-compose"> <span>Docker Compose</span><small>Multi-container apps</small></label>
-            <label class="module"><input type="checkbox" value="portainer"> <span>Portainer</span><small>Docker dashboard</small></label>
-            <label class="module"><input type="checkbox" value="nvidia-rtx-passthrough"> <span>GPU Passthrough</span><small>AMD, NVIDIA, Intel, and VFIO helper checks</small></label>
-            <label class="module"><input type="checkbox" value="tailscale-access"> <span>Tailscale</span><small>Remote access</small></label>
-            <label class="module"><input type="checkbox" value="monitoring"> <span>Monitoring</span><small>Charts and health</small></label>
-          </div>
-        </section>
-
-        <section class="step" id="pair">
-          <div class="grid two">
-            <article class="card pair-card">
-              <h4>Pairing PIN</h4>
-              <div id="pair-code" class="pair-code">------</div>
-              <img id="pair-qr" class="pair-qr hidden" alt="VMnas pairing QR code">
-              <p id="pair-url" class="muted">Scan the QR code to load this server's pairing info.</p>
-              <button id="rotate-pin" class="secondary">New PIN</button>
-            </article>
-            <article class="card">
-              <h4>Pair a client</h4>
-              <ol class="steps">
-                <li>Install VMnas Admin on your device.</li>
-                <li>Scan the QR code to fill the server address and PIN.</li>
-                <li>Confirm pairing on the client.</li>
-              </ol>
             </article>
           </div>
         </section>
@@ -164,6 +106,44 @@
             <h4>Ready to install</h4>
             <p>VMnas will repartition the selected server drive only, install the server stack, create the LAN bridge automatically, and leave the remaining space on that drive ready as VMNAS-DATA.</p>
             <p id="password-warning" class="warning hidden">Set and confirm the admin password before installing.</p>
+            <div class="summary-grid">
+              <div><span>Drive</span><strong id="review-drive">Choose a drive</strong></div>
+              <div><span>Admin</span><strong id="review-admin">Set password</strong></div>
+              <div><span>Network</span><strong id="review-network">Checking</strong></div>
+            </div>
+            <details class="advanced">
+              <summary>Advanced settings</summary>
+              <div class="advanced-grid">
+                <article>
+                  <h5>Detected Host</h5>
+                  <dl id="hardware-list">
+                    <div><dt>CPU</dt><dd>Checking...</dd></div>
+                    <div><dt>Memory</dt><dd>Checking...</dd></div>
+                    <div><dt>Network</dt><dd>Checking...</dd></div>
+                  </dl>
+                </article>
+                <article>
+                  <h5>NAS Resources</h5>
+                  <label>NAS CPU <output id="cpu-out">1 vCPU</output></label>
+                  <input id="nas-cpu" type="range" min="1" max="1" value="1" step="1">
+                  <label>NAS RAM <output id="ram-out">1 GB</output></label>
+                  <input id="nas-ram" type="range" min="1" max="1" value="1" step="1">
+                  <label class="check"><input id="enable-iommu" type="checkbox" checked> Enable IOMMU and VFIO support</label>
+                </article>
+              </div>
+              <div class="module-grid compact">
+                <label class="module selected"><input type="checkbox" value="security-baseline" checked> <span>Security Baseline</span><small>Firewall and safer defaults</small></label>
+                <label class="module selected"><input type="checkbox" value="openmediavault" checked> <span>OpenMediaVault NAS</span><small>NAS, VPN, and storage defaults</small></label>
+                <label class="module selected"><input type="checkbox" value="docker-engine" checked> <span>Docker Engine</span><small>Container runtime</small></label>
+                <label class="module selected"><input type="checkbox" value="wireguard-local-vpn" checked> <span>WireGuard VPN</span><small>Secure remote NAS access</small></label>
+                <label class="module selected"><input type="checkbox" value="transmission" checked> <span>Transmission</span><small>NAS BitTorrent client</small></label>
+                <label class="module"><input type="checkbox" value="docker-compose"> <span>Docker Compose</span><small>Multi-container apps</small></label>
+                <label class="module"><input type="checkbox" value="portainer"> <span>Portainer</span><small>Docker dashboard</small></label>
+                <label class="module"><input type="checkbox" value="nvidia-rtx-passthrough"> <span>GPU Passthrough</span><small>AMD, NVIDIA, Intel, and VFIO helper checks</small></label>
+                <label class="module"><input type="checkbox" value="tailscale-access"> <span>Tailscale</span><small>Remote access</small></label>
+                <label class="module"><input type="checkbox" value="monitoring"> <span>Monitoring</span><small>Charts and health</small></label>
+              </div>
+            </details>
             <div class="phase-row">
               <span>Current phase</span>
               <strong id="install-phase">Ready</strong>
@@ -176,6 +156,13 @@
               <p id="install-report-path" class="report-path hidden"></p>
             </div>
             <pre id="install-log"></pre>
+            <div class="pair-after">
+              <h4>Pair after install</h4>
+              <div id="pair-code" class="pair-code">------</div>
+              <img id="pair-qr" class="pair-qr hidden" alt="VMnas pairing QR code">
+              <p id="pair-url" class="muted">Scan this code from the client after the server finishes installing.</p>
+              <button id="rotate-pin" class="secondary">New PIN</button>
+            </div>
           </div>
         </section>
 

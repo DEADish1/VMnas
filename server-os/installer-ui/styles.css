@@ -25,7 +25,7 @@ body {
 
 .shell {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: 220px minmax(0, 1fr);
   min-height: 100vh;
 }
 
@@ -67,7 +67,8 @@ h1, h2, h3, h4, p {
 
 nav {
   display: grid;
-  gap: 8px;
+  gap: 10px;
+  counter-reset: installer-step;
 }
 
 button, input {
@@ -82,15 +83,37 @@ button, input {
 }
 
 .nav-item {
+  position: relative;
   text-align: left;
-  padding: 8px 10px;
+  padding: 10px 10px 10px 44px;
   color: var(--text);
   background: transparent;
+}
+
+.nav-item::before {
+  counter-increment: installer-step;
+  content: counter(installer-step);
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  color: var(--muted);
+  background: #dbe2eb;
+  transform: translateY(-50%);
 }
 
 .nav-item.active {
   background: #fff;
   border-color: var(--line);
+}
+
+.nav-item.active::before {
+  color: #fff;
+  background: var(--accent);
 }
 
 .content {
@@ -211,7 +234,7 @@ output {
   color: var(--muted);
 }
 
-input[type="text"], input:not([type]) {
+input[type="text"], input[type="password"], input:not([type]) {
   width: 100%;
   min-height: 38px;
   padding: 8px 10px;
@@ -229,6 +252,15 @@ input[type="range"] {
   align-items: center;
   gap: 8px;
   font-weight: 500;
+}
+
+.confirm-check {
+  align-items: flex-start;
+  margin-top: 18px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
 }
 
 .module-grid {
@@ -285,6 +317,59 @@ input[type="range"] {
   background: #f0f4fa;
 }
 
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.summary-grid div {
+  min-height: 76px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+}
+
+.summary-grid span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.summary-grid strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.advanced {
+  margin: 16px 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+}
+
+.advanced summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.advanced-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 16px;
+}
+
+.advanced h5 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
 .module {
   min-height: 112px;
   padding: 16px;
@@ -309,7 +394,19 @@ input[type="range"] {
   font-weight: 700;
 }
 
+.module-grid.compact {
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  margin-top: 16px;
+}
+
 .pair-card {
+  text-align: center;
+}
+
+.pair-after {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
   text-align: center;
 }
 
@@ -419,7 +516,7 @@ pre {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .two, .three {
+  .two, .three, .summary-grid, .advanced-grid {
     grid-template-columns: 1fr;
   }
 }
