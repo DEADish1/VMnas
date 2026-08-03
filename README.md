@@ -196,8 +196,10 @@ Expected user flow:
 2. The live desktop auto-opens the VMnas installer.
 3. Choose hardware defaults, admin name, and starter modules.
 4. Click `Install VMnas Server`.
-5. When the installer finishes, use the pairing PIN shown on screen.
-6. Open VMnas Admin on Mac, iPhone, Android, or a browser client and enter the PIN.
+5. Reboot when prompted.
+6. VMnas automatically creates the Proxmox `vmbr0` LAN bridge with DHCP on the detected wired interface.
+7. Scan the pairing QR code or use the pairing PIN shown on screen.
+8. Open VMnas Admin on Mac, iPhone, Android, or a browser client and pair.
 
 The default module selection installs Security Baseline, OpenMediaVault NAS, Docker Engine, WireGuard Local VPN, and Transmission BitTorrent. Transmission stores downloads under `/srv/vmnas/downloads`, watches `/srv/vmnas/watch`, and exposes its authenticated web UI on port `9091` for trusted LAN/VPN use.
 

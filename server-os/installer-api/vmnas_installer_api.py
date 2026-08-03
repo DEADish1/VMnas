@@ -66,6 +66,18 @@ def detected_server_urls() -> list[str]:
     return urls
 
 
+def detected_ipv4_addresses() -> list[str]:
+    addresses = []
+    try:
+        result = subprocess.run(["hostname", "-I"], check=False, text=True, capture_output=True, timeout=4)
+        for address in result.stdout.split():
+            if ":" not in address and address not in addresses:
+                addresses.append(address)
+    except Exception:  # noqa: BLE001
+        pass
+    return addresses
+
+
 def pairing_payload(pin: str) -> dict:
     urls = detected_server_urls()
     api_url = urls[0]
@@ -128,7 +140,8 @@ def hardware() -> dict:
                 gpu_names.append(line.strip())
     except FileNotFoundError:
         gpu_names.append("GPU detection tool unavailable in this boot environment")
-    network = "Connected" if any(Path("/sys/class/net").glob("e*")) else "Check cable"
+    addresses = detected_ipv4_addresses()
+    network = f"Connected: {', '.join(addresses)}" if addresses else "Check cable or DHCP"
     return {
         "cpu": cpu_name,
         "cpu_logical": cpu_logical,
@@ -139,6 +152,7 @@ def hardware() -> dict:
         "nas_default_memory_gb": max(1, min(usable_memory_gb, int(memory_gb * 0.25))),
         "gpu": gpu_names,
         "network": network,
+        "ipv4": addresses,
     }
 
 
