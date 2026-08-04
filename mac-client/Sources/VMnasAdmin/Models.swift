@@ -616,10 +616,11 @@ extension StoreModule {
             name: "Jellyfin Media Server",
             category: .apps,
             summary: "Self-hosted movies, shows, and music.",
-            details: "Deploys Jellyfin with media folder mapping and optional NVIDIA hardware acceleration.",
+            details: "Deploys Jellyfin with movies, TV, music, and photo folders from the VMnas media library. Intended for easy LAN or VPN streaming without subscriptions.",
             sizeMb: 520,
             required: false,
-            tags: ["Media", "NVIDIA"]
+            tags: ["Media", "Streaming", "Movies", "Music"],
+            dependencies: ["docker-engine", "docker-compose"]
         ),
         StoreModule(
             id: "plex",
@@ -630,7 +631,7 @@ extension StoreModule {
             sizeMb: 610,
             required: false,
             tags: ["Media", "Streaming", "GPU"],
-            dependencies: ["docker-engine"]
+            dependencies: ["docker-engine", "docker-compose"]
         ),
         StoreModule(
             id: "emby",
@@ -641,7 +642,40 @@ extension StoreModule {
             sizeMb: 540,
             required: false,
             tags: ["Media", "Streaming"],
-            dependencies: ["docker-engine"]
+            dependencies: ["docker-engine", "docker-compose"]
+        ),
+        StoreModule(
+            id: "navidrome",
+            name: "Navidrome Music Server",
+            category: .apps,
+            summary: "Fast private music streaming.",
+            details: "Deploys Navidrome for personal music streaming from /srv/vmnas/media/music with persistent playlists, users, and scan data.",
+            sizeMb: 120,
+            required: false,
+            tags: ["Media", "Music", "Streaming"],
+            dependencies: ["docker-engine", "docker-compose"]
+        ),
+        StoreModule(
+            id: "audiobookshelf",
+            name: "Audiobookshelf",
+            category: .apps,
+            summary: "Audiobook and podcast streaming.",
+            details: "Deploys Audiobookshelf with audiobook, podcast, and metadata folders under the VMnas media library.",
+            sizeMb: 340,
+            required: false,
+            tags: ["Media", "Audiobooks", "Podcasts"],
+            dependencies: ["docker-engine", "docker-compose"]
+        ),
+        StoreModule(
+            id: "ersatztv",
+            name: "ErsatzTV",
+            category: .apps,
+            summary: "Create live-style channels from your media.",
+            details: "Deploys ErsatzTV so users can build custom streaming channels from local movies, shows, and videos stored on the NAS.",
+            sizeMb: 520,
+            required: false,
+            tags: ["Media", "Channels", "Streaming"],
+            dependencies: ["docker-engine", "docker-compose"]
         ),
         StoreModule(
             id: "arr-media-stack",

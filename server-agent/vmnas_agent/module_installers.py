@@ -313,8 +313,9 @@ def install_jellyfin() -> None:
       - /srv/vmnas/apps/jellyfin/config:/config
       - /srv/vmnas/apps/jellyfin/cache:/cache
       - /srv/vmnas/media:/media
+      - /srv/vmnas/photos:/photos
 """,
-        "Jellyfin module\nManaged Jellyfin Compose stack staged with /srv/vmnas/media mapping.\n",
+        "Jellyfin module\nManaged Jellyfin Compose stack staged with VMnas media and photo library mappings.\n",
     )
 
 
@@ -334,6 +335,67 @@ def install_emby() -> None:
       - /srv/vmnas/media:/media
 """,
         "Emby module\nManaged Emby Compose stack staged with /srv/vmnas/media mapping.\n",
+    )
+
+
+def install_navidrome() -> None:
+    write_compose_stack(
+        "navidrome",
+        """services:
+  navidrome:
+    image: deluan/navidrome:latest
+    container_name: vmnas-navidrome
+    restart: unless-stopped
+    ports:
+      - "4533:4533"
+    environment:
+      - ND_SCANSCHEDULE=1h
+      - ND_LOGLEVEL=info
+      - ND_SESSIONTIMEOUT=24h
+      - ND_BASEURL=
+    volumes:
+      - /srv/vmnas/apps/navidrome/data:/data
+      - /srv/vmnas/media/music:/music:ro
+""",
+        "Navidrome module\nManaged private music streaming stack staged for /srv/vmnas/media/music.\n",
+    )
+
+
+def install_audiobookshelf() -> None:
+    write_compose_stack(
+        "audiobookshelf",
+        """services:
+  audiobookshelf:
+    image: ghcr.io/advplyr/audiobookshelf:latest
+    container_name: vmnas-audiobookshelf
+    restart: unless-stopped
+    ports:
+      - "13378:80"
+    volumes:
+      - /srv/vmnas/media/audiobooks:/audiobooks
+      - /srv/vmnas/media/podcasts:/podcasts
+      - /srv/vmnas/apps/audiobookshelf/config:/config
+      - /srv/vmnas/apps/audiobookshelf/metadata:/metadata
+""",
+        "Audiobookshelf module\nManaged audiobook and podcast streaming stack staged under the VMnas media library.\n",
+    )
+
+
+def install_ersatztv() -> None:
+    write_compose_stack(
+        "ersatztv",
+        """services:
+  ersatztv:
+    image: jasongdove/ersatztv:latest
+    container_name: vmnas-ersatztv
+    restart: unless-stopped
+    ports:
+      - "8409:8409"
+    volumes:
+      - /srv/vmnas/apps/ersatztv/config:/root/.local/share/ersatztv
+      - /srv/vmnas/media:/media:ro
+""",
+        "ErsatzTV module\nManaged custom channel streaming stack staged against the VMnas media library.\n",
     )
 
 
@@ -654,6 +716,9 @@ INSTALLERS = {
     "plex": install_plex,
     "jellyfin": install_jellyfin,
     "emby": install_emby,
+    "navidrome": install_navidrome,
+    "audiobookshelf": install_audiobookshelf,
+    "ersatztv": install_ersatztv,
     "arr-media-stack": install_arr_media_stack,
     "immich": install_immich,
     "photoprism": install_photoprism,

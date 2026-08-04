@@ -329,6 +329,12 @@ The Module Store is designed so users can click `Download` for capabilities the 
 - K3s Kubernetes
 - Home Assistant
 - Jellyfin Media Server
+- Plex Media Server
+- Emby Media Server
+- Navidrome Music Server
+- Audiobookshelf
+- ErsatzTV custom streaming channels
+- Arr Media Automation
 - Nextcloud
 - Minecraft Server
 - PostgreSQL
@@ -402,6 +408,13 @@ Implemented server-side module installers:
 - Tailscale: stages remote access notes and installs the package when available
 - WireGuard Local VPN Server: installs WireGuard tools and stages server/client VPN templates
 - Transmission BitTorrent: deploys a managed Transmission container for the NAS download hub
+- Plex Media Server: deploys a managed streaming container mapped to `/srv/vmnas/media`
+- Jellyfin Media Server: deploys a managed streaming container mapped to media and photo libraries
+- Emby Media Server: deploys a managed streaming container mapped to `/srv/vmnas/media`
+- Navidrome Music Server: deploys private music streaming from `/srv/vmnas/media/music`
+- Audiobookshelf: deploys audiobook and podcast streaming from the VMnas media library
+- ErsatzTV: deploys custom live-style channels from local NAS media
+- Arr Media Automation: deploys Sonarr, Radarr, Prowlarr, and qBittorrent
 - Monitoring: installs Prometheus Node Exporter when available
 - Backup Scheduler: stages a default VM backup policy
 
