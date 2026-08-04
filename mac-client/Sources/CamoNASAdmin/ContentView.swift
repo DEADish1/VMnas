@@ -1379,169 +1379,227 @@ struct ContentView: View {
     }
 
     private var settings: some View {
-        Form {
-            Section("Server") {
-                Label(api.isConnected ? "Connected to Camo NAS" : api.isServerReachable ? "Server found" : "Find your Camo NAS server", systemImage: api.isConnected ? "checkmark.shield.fill" : api.isServerReachable ? "link.badge.plus" : "dot.radiowaves.left.and.right")
-                    .font(.headline)
-                Text(api.connectionMessage)
-                    .foregroundStyle(.secondary)
-                HStack {
-                    Button(api.isDiscoveringServer ? "Looking..." : "Find Server") {
-                        Task { await api.findServer() }
-                    }
-                    .buttonStyle(CamoNASButtonStyle(prominent: true))
-                    .disabled(api.isDiscoveringServer)
-                    Button("Refresh") {
-                        Task { await refresh() }
-                    }
-                    .disabled(api.isDiscoveringServer)
-                }
-                TextField("Server address", text: $api.serverBaseURL)
-                Text("Usually you can click Find Server. If that does not work, type the address shown on the Camo NAS server screen.")
-                    .foregroundStyle(.secondary)
-                LabeledContent("Server", value: api.isServerReachable ? "Reachable" : "Not reachable")
-                LabeledContent("Admin", value: api.isConnected ? "Paired and connected" : "Not paired")
-            }
-            Section("Server Modules") {
-                LabeledContent("Module Store", value: api.isModuleStoreAvailable ? "Unlocked" : "Locked")
-                Text(api.moduleStoreStatusText)
-                    .foregroundStyle(.secondary)
-            }
-            Section("Server Updates") {
-                if let update = api.updateStatus {
-                    LabeledContent("Status", value: update.running ? "Running" : update.status.capitalized)
-                    if !update.startedAt.isEmpty {
-                        LabeledContent("Started", value: update.startedAt)
-                    }
-                    if !update.finishedAt.isEmpty {
-                        LabeledContent("Finished", value: update.finishedAt)
-                    }
-                    if update.exitCode != 0 {
-                        LabeledContent("Exit code", value: "\(update.exitCode)")
-                    }
-                    Text(update.message)
-                        .foregroundStyle(update.status == "failed" ? .red : .secondary)
-                    if !update.logTail.isEmpty {
-                        DisclosureGroup("Update Log") {
-                            ScrollView {
-                                Text(update.logTail.joined(separator: "\n"))
-                                    .font(.system(.caption, design: .monospaced))
-                                    .textSelection(.enabled)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.vertical, 6)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                topBar(title: "Settings")
+
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 330), spacing: 16, alignment: .top)],
+                    alignment: .leading,
+                    spacing: 16
+                ) {
+                    settingsTile(
+                        title: "Server Connection",
+                        status: api.isConnected ? "Paired and ready" : api.isServerReachable ? "Server found" : "Not connected",
+                        icon: api.isConnected ? "checkmark.shield.fill" : api.isServerReachable ? "link.badge.plus" : "dot.radiowaves.left.and.right"
+                    ) {
+                        Text(api.connectionMessage)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        HStack {
+                            Button(api.isDiscoveringServer ? "Looking..." : "Find Server") {
+                                Task { await api.findServer() }
                             }
-                            .frame(minHeight: 120, maxHeight: 260)
+                            .buttonStyle(CamoNASButtonStyle(prominent: true))
+                            .disabled(api.isDiscoveringServer)
+                            Button("Refresh") {
+                                Task { await refresh() }
+                            }
+                            .buttonStyle(CamoNASButtonStyle())
+                            .disabled(api.isDiscoveringServer)
+                        }
+                        TextField("Server address", text: $api.serverBaseURL)
+                            .textFieldStyle(.roundedBorder)
+                        Text("Use Find Server first. If it does not work, type the address shown on the Camo NAS server screen.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        settingsStatusRow("Server", api.isServerReachable ? "Reachable" : "Not reachable")
+                        settingsStatusRow("Admin", api.isConnected ? "Paired" : "Not paired")
+                    }
+
+                    settingsTile(
+                        title: "Pair This Device",
+                        status: api.deviceToken == nil ? "Enter server code" : "This Mac is paired",
+                        icon: api.deviceToken == nil ? "key" : "key.fill"
+                    ) {
+                        if let status = api.pairingStatus {
+                            settingsStatusRow("Pairing", status.enabled ? "Enabled" : "Disabled")
+                            settingsStatusRow("PIN hint", status.pinHint)
+                            settingsStatusRow("Paired devices", "\(status.pairedDevices)")
+                        }
+                        TextField("Device name", text: $deviceName)
+                            .textFieldStyle(.roundedBorder)
+                        SecureField("Pairing code from server", text: $pairingPin)
+                            .textFieldStyle(.roundedBorder)
+                        Button(api.deviceToken == nil ? "Connect This Mac" : "Connected") {
+                            Task {
+                                await api.pair(deviceName: deviceName, pin: pairingPin)
+                                pairingPin = ""
+                            }
+                        }
+                        .buttonStyle(CamoNASButtonStyle(prominent: true))
+                        .disabled(pairingPin.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || api.deviceToken != nil || api.isDiscoveringServer)
+                        if api.deviceToken != nil {
+                            Label("Secure access is saved in Keychain.", systemImage: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                        }
+                        HStack {
+                            Button("New Pairing PIN") {
+                                Task { await api.rotatePairingPin() }
+                            }
+                            .buttonStyle(CamoNASButtonStyle())
+                            Button(showPairingQR ? "Hide QR" : "Show QR") {
+                                showPairingQR.toggle()
+                            }
+                            .buttonStyle(CamoNASButtonStyle())
+                        }
+                        if let pin = api.latestPairingPin {
+                            settingsStatusRow("New PIN", pin)
+                        }
+                        if showPairingQR, let image = pairingQRCode() {
+                            Image(nsImage: image)
+                                .interpolation(.none)
+                                .resizable()
+                                .frame(width: 160, height: 160)
+                                .padding(8)
+                                .background(Color.white, in: RoundedRectangle(cornerRadius: 8))
                         }
                     }
-                } else {
-                    Text("Pair with the server to check or run server updates.")
-                        .foregroundStyle(.secondary)
-                }
-                HStack {
-                    Button("Check Status") {
-                        Task { await api.refreshUpdateStatus() }
-                    }
-                    .buttonStyle(CamoNASButtonStyle())
-                    Button(isStartingServerUpdate || api.updateStatus?.running == true ? "Updating" : "Run Server Update") {
-                        Task { await runServerUpdateFromClient() }
-                    }
-                    .buttonStyle(CamoNASButtonStyle(prominent: true))
-                    .disabled(!api.isConnected || isStartingServerUpdate || api.updateStatus?.running == true)
-                }
-            }
-            Section("Pair This Device") {
-                if let status = api.pairingStatus {
-                    LabeledContent("Pairing", value: status.enabled ? "Enabled" : "Disabled")
-                    LabeledContent("PIN hint", value: status.pinHint)
-                    LabeledContent("Paired devices", value: "\(status.pairedDevices)")
-                }
-                TextField("Device name", text: $deviceName)
-                SecureField("Pairing code from server", text: $pairingPin)
-                Button(api.deviceToken == nil ? "Connect This Mac" : "Connected") {
-                    Task {
-                        await api.pair(deviceName: deviceName, pin: pairingPin)
-                        pairingPin = ""
-                    }
-                }
-                .buttonStyle(CamoNASButtonStyle(prominent: true))
-                .disabled(pairingPin.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || api.deviceToken != nil || api.isDiscoveringServer)
-                if api.deviceToken != nil {
-                    Label("This Mac is paired. Secure access is saved in Keychain.", systemImage: "key.fill")
-                        .foregroundStyle(.green)
-                }
-                HStack {
-                    Button("New Pairing PIN") {
-                        Task { await api.rotatePairingPin() }
-                    }
-                    .buttonStyle(CamoNASButtonStyle())
-                    Button("Show QR") {
-                        showPairingQR.toggle()
-                    }
-                    .buttonStyle(CamoNASButtonStyle())
-                }
-                if let pin = api.latestPairingPin {
-                    LabeledContent("New PIN", value: pin)
-                }
-                if showPairingQR, let image = pairingQRCode() {
-                    Image(nsImage: image)
-                        .interpolation(.none)
-                        .resizable()
-                        .frame(width: 160, height: 160)
-                }
-            }
-            Section("Paired Devices") {
-                if api.pairedDevices.isEmpty {
-                    Text("No paired devices yet.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(api.pairedDevices) { device in
+
+                    settingsTile(
+                        title: "Server Updates",
+                        status: api.updateStatus?.running == true ? "Running" : api.updateStatus?.status.capitalized ?? "Waiting for server",
+                        icon: "arrow.triangle.2.circlepath"
+                    ) {
+                        if let update = api.updateStatus {
+                            settingsStatusRow("Status", update.running ? "Running" : update.status.capitalized)
+                            if !update.startedAt.isEmpty {
+                                settingsStatusRow("Started", update.startedAt)
+                            }
+                            if !update.finishedAt.isEmpty {
+                                settingsStatusRow("Finished", update.finishedAt)
+                            }
+                            if update.exitCode != 0 {
+                                settingsStatusRow("Exit code", "\(update.exitCode)")
+                            }
+                            Text(update.message)
+                                .foregroundStyle(update.status == "failed" ? .red : .secondary)
+                            if !update.logTail.isEmpty {
+                                DisclosureGroup("Update Log") {
+                                    ScrollView {
+                                        Text(update.logTail.joined(separator: "\n"))
+                                            .font(.system(.caption, design: .monospaced))
+                                            .textSelection(.enabled)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .padding(.vertical, 6)
+                                    }
+                                    .frame(minHeight: 120, maxHeight: 260)
+                                }
+                            }
+                        } else {
+                            Text("Pair with the server to check or run server updates.")
+                                .foregroundStyle(.secondary)
+                        }
                         HStack {
-                            Text(device.name)
-                            Spacer()
-                            Button("Revoke") {
-                                Task { await api.revokeDevice(id: device.id) }
+                            Button("Check Status") {
+                                Task { await api.refreshUpdateStatus() }
+                            }
+                            .buttonStyle(CamoNASButtonStyle())
+                            Button(isStartingServerUpdate || api.updateStatus?.running == true ? "Updating" : "Run Server Update") {
+                                Task { await runServerUpdateFromClient() }
+                            }
+                            .buttonStyle(CamoNASButtonStyle(prominent: true))
+                            .disabled(!api.isConnected || isStartingServerUpdate || api.updateStatus?.running == true)
+                        }
+                    }
+
+                    settingsTile(
+                        title: "Apps Store",
+                        status: api.isModuleStoreAvailable ? "Unlocked" : "Locked",
+                        icon: api.isModuleStoreAvailable ? "shippingbox.fill" : "lock.fill"
+                    ) {
+                        settingsStatusRow("Module Store", api.isModuleStoreAvailable ? "Unlocked" : "Locked")
+                        Text(api.moduleStoreStatusText)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    settingsTile(
+                        title: "Paired Devices",
+                        status: api.pairedDevices.isEmpty ? "No devices yet" : "\(api.pairedDevices.count) devices",
+                        icon: "macbook.and.iphone"
+                    ) {
+                        if api.pairedDevices.isEmpty {
+                            Text("No paired devices yet.")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(api.pairedDevices) { device in
+                                HStack(spacing: 10) {
+                                    Image(systemName: "display")
+                                        .foregroundStyle(CamoNASTheme.accent)
+                                    Text(device.name)
+                                    Spacer()
+                                    Button("Revoke") {
+                                        Task { await api.revokeDevice(id: device.id) }
+                                    }
+                                    .buttonStyle(CamoNASButtonStyle())
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
+                    }
+
+                    settingsTile(
+                        title: "Remote Access",
+                        status: api.remoteStatus?.authenticated == true ? "Ready" : api.remoteStatus?.message ?? "Not enabled",
+                        icon: "network.badge.shield.half.filled"
+                    ) {
+                        if let remote = api.remoteStatus {
+                            settingsStatusRow("Provider", remote.provider.capitalized)
+                            settingsStatusRow("Status", remote.authenticated ? "Ready" : remote.message)
+                            if !remote.remoteIp.isEmpty {
+                                settingsStatusRow("Remote IP", remote.remoteIp)
+                            }
+                            if !remote.adminUrl.isEmpty {
+                                settingsStatusRow("Remote API", remote.adminUrl)
+                            }
+                        } else {
+                            Text("Enable secure remote access after pairing with your server.")
+                                .foregroundStyle(.secondary)
+                        }
+                        HStack {
+                            Button("Enable Remote Access") {
+                                Task { await api.setRemoteAccess(enabled: true) }
+                            }
+                            .buttonStyle(CamoNASButtonStyle(prominent: true))
+                            Button("Disable") {
+                                Task { await api.setRemoteAccess(enabled: false) }
                             }
                             .buttonStyle(CamoNASButtonStyle())
                         }
                     }
-                }
-            }
-            Section("Advanced Fallback") {
-                Button("Open Proxmox Recovery UI") {
-                    if let url = api.proxmoxURL() {
-                        NSWorkspace.shared.open(url)
+
+                    settingsTile(
+                        title: "Recovery Tools",
+                        status: "Advanced",
+                        icon: "wrench.and.screwdriver"
+                    ) {
+                        Button("Open Proxmox Recovery UI") {
+                            if let url = api.proxmoxURL() {
+                                NSWorkspace.shared.open(url)
+                            }
+                        }
+                        .buttonStyle(CamoNASButtonStyle())
+                        Text("Camo NAS is the normal control interface. Use this only for low-level recovery or advanced troubleshooting.")
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Toggle("Prefer noVNC browser console", isOn: .constant(true))
+                        Toggle("Use RDP for Windows VMs", isOn: .constant(true))
                     }
                 }
-                .buttonStyle(CamoNASButtonStyle())
-                Text("Camo NAS is the normal control interface. Use this only for low-level recovery or advanced troubleshooting.")
-                    .foregroundStyle(.secondary)
-                Toggle("Prefer noVNC browser console", isOn: .constant(true))
-                Toggle("Use RDP for Windows VMs", isOn: .constant(true))
             }
-            Section("Remote Access") {
-                if let remote = api.remoteStatus {
-                    LabeledContent("Provider", value: remote.provider.capitalized)
-                    LabeledContent("Status", value: remote.authenticated ? "Ready" : remote.message)
-                    if !remote.remoteIp.isEmpty {
-                        LabeledContent("Remote IP", value: remote.remoteIp)
-                    }
-                    if !remote.adminUrl.isEmpty {
-                        LabeledContent("Remote API", value: remote.adminUrl)
-                    }
-                }
-                Button("Enable Remote Access") {
-                    Task { await api.setRemoteAccess(enabled: true) }
-                }
-                .buttonStyle(CamoNASButtonStyle(prominent: true))
-                Button("Disable Remote Access") {
-                    Task { await api.setRemoteAccess(enabled: false) }
-                }
-                .buttonStyle(CamoNASButtonStyle())
-            }
+            .padding(24)
         }
-        .padding(24)
-        .scrollContentBackground(.hidden)
-        .background(Color.black.opacity(0.24))
         .navigationTitle("Settings")
     }
 
@@ -1951,6 +2009,57 @@ struct ContentView: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(CamoNASTheme.border.opacity(0.65), lineWidth: 1)
         )
+    }
+
+    private func settingsTile<Content: View>(
+        title: String,
+        status: String,
+        icon: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: icon)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(CamoNASTheme.accentHot)
+                    .frame(width: 28, height: 28)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                    Text(status)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(CamoNASTheme.textMuted)
+                        .lineLimit(2)
+                }
+                Spacer(minLength: 8)
+            }
+            Divider()
+                .overlay(CamoNASTheme.border.opacity(0.45))
+            content()
+        }
+        .frame(maxWidth: .infinity, minHeight: 210, alignment: .topLeading)
+        .padding(16)
+        .background(CamoNASCardBackground())
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(CamoNASTheme.border.opacity(0.65), lineWidth: 1)
+        )
+    }
+
+    private func settingsStatusRow(_ label: String, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(label)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 8)
+            Text(value)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.trailing)
+                .lineLimit(2)
+        }
     }
 
     private func statusBanner(_ message: String) -> some View {
