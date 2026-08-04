@@ -66,6 +66,20 @@ class HostDisk(BaseModel):
     mountpoints: list[str] = []
 
 
+class StorageIngestSource(BaseModel):
+    id: str
+    name: str
+    path: str
+    size_gb: float
+    filesystem: str = ""
+    mountpoint: str = ""
+    removable: bool = False
+    transport: str = ""
+    ready: bool = False
+    status: str = ""
+    recommended_action: str = ""
+
+
 class VmPreset(BaseModel):
     name: str
     label: str = ""

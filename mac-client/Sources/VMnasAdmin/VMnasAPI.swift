@@ -6,6 +6,7 @@ final class VMnasAPI: ObservableObject {
     @Published var resources: HostResources?
     @Published var compatibility: HostCompatibility?
     @Published var disks: [HostDisk] = []
+    @Published var ingestSources: [StorageIngestSource] = []
     @Published var benchmark: SystemBenchmark?
     @Published var nasPreset: VmPreset?
     @Published var vmPresets: [VmPreset] = []
@@ -73,6 +74,7 @@ final class VMnasAPI: ObservableObject {
             async let resources: HostResources = get("/host/resources")
             async let compatibility: HostCompatibility = get("/host/compatibility")
             async let disks: [HostDisk] = get("/host/disks")
+            async let ingestSources: [StorageIngestSource] = get("/storage/ingest-sources")
             async let benchmark: SystemBenchmark = get("/host/benchmark/latest")
             async let preset: VmPreset = get("/presets/nas")
             async let presets: [VmPreset] = get("/presets/vms")
@@ -86,6 +88,7 @@ final class VMnasAPI: ObservableObject {
             self.resources = try await resources
             self.compatibility = try await compatibility
             self.disks = try await disks
+            self.ingestSources = try await ingestSources
             self.benchmark = try await benchmark
             self.nasPreset = try await preset
             self.vmPresets = try await presets
@@ -146,11 +149,13 @@ final class VMnasAPI: ObservableObject {
             async let compatibility: HostCompatibility = get("/host/compatibility")
             async let gpus: [GpuDevice] = get("/host/gpus")
             async let disks: [HostDisk] = get("/host/disks")
+            async let ingestSources: [StorageIngestSource] = get("/storage/ingest-sources")
             async let benchmark: SystemBenchmark = get("/host/benchmark/latest")
             self.resources = try await resources
             self.compatibility = try await compatibility
             self.gpus = try await gpus
             self.disks = try await disks
+            self.ingestSources = try await ingestSources
             self.benchmark = try await benchmark
             self.errorMessage = nil
         } catch {
@@ -427,6 +432,7 @@ final class VMnasAPI: ObservableObject {
         resources = nil
         compatibility = nil
         disks = []
+        ingestSources = []
         benchmark = nil
         nasPreset = nil
         vmPresets = []

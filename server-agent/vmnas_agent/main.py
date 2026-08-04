@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .benchmark import BenchmarkStore, run_system_benchmark
 from .isos import IsoStore
-from .models import CompatibilityWorkload, DiscoveryInfo, GpuDevice, HostCompatibility, HostDisk, HostResources, IsoImage, ModuleInstallResponse, OsDownloadResponse, OsStoreItem, PairedDevice, PairingPinResponse, PairingRequest, PairingResponse, PairingStatus, RemoteAccessStatus, ServerUpdateStatus, SnapshotRequest, SnapshotSummary, StoreModule, SystemBenchmark, VmAccessLinks, VmCreateRequest, VmPreset, VmSummary, WindowsTuningApplyResponse, WindowsTuningConfig
+from .models import CompatibilityWorkload, DiscoveryInfo, GpuDevice, HostCompatibility, HostDisk, HostResources, IsoImage, ModuleInstallResponse, OsDownloadResponse, OsStoreItem, PairedDevice, PairingPinResponse, PairingRequest, PairingResponse, PairingStatus, RemoteAccessStatus, ServerUpdateStatus, SnapshotRequest, SnapshotSummary, StorageIngestSource, StoreModule, SystemBenchmark, VmAccessLinks, VmCreateRequest, VmPreset, VmSummary, WindowsTuningApplyResponse, WindowsTuningConfig
 from .os_store import OsStore
 from .pairing import PairingStore
 from .proxmox import ProxmoxCli, ProxmoxUnavailable
@@ -135,6 +135,88 @@ def detected_disks() -> list[HostDisk]:
     return disks
 
 
+def detected_ingest_sources() -> list[StorageIngestSource]:
+    lsblk = Path("/usr/bin/lsblk")
+    if not lsblk.exists():
+        return []
+    result = subprocess.run(
+        [str(lsblk), "--json", "--bytes", "--output", "NAME,PATH,SIZE,MODEL,TYPE,TRAN,RM,FSTYPE,MOUNTPOINTS"],
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        return []
+
+    try:
+        payload = json.loads(result.stdout or "{}")
+    except json.JSONDecodeError:
+        return []
+
+    sources: list[StorageIngestSource] = []
+
+    def add_item(item: dict, parent: dict | None = None) -> None:
+        item_type = item.get("type") or ""
+        path = item.get("path") or ""
+        mountpoints = [value for value in item.get("mountpoints") or [] if value]
+        mountpoint = mountpoints[0] if mountpoints else ""
+        removable = bool(item.get("rm") or (parent or {}).get("rm"))
+        transport = item.get("tran") or (parent or {}).get("tran") or ""
+        filesystem = item.get("fstype") or ""
+        size_gb = round(int(item.get("size") or 0) / 1000 / 1000 / 1000, 1)
+        is_system = any(point in {"/", "/boot", "/boot/efi"} for point in mountpoints)
+        is_candidate = item_type in {"part", "disk"} and path and (removable or transport in {"usb", "sata", "ata", "nvme"} or mountpoint.startswith("/media") or mountpoint.startswith("/mnt"))
+
+        if is_candidate:
+            if is_system:
+                status = "System drive"
+                action = "Do not import from the server system drive."
+                ready = False
+            elif mountpoint:
+                status = "Ready"
+                action = "Open this drive in the NAS import screen."
+                ready = True
+            elif filesystem:
+                status = "Needs mount"
+                action = "Mount this drive, then refresh."
+                ready = False
+            else:
+                status = "No readable filesystem"
+                action = "Use a drive formatted as exFAT, NTFS, FAT32, or a Linux filesystem."
+                ready = False
+
+            sources.append(
+                StorageIngestSource(
+                    id=path,
+                    name=item.get("model") or item.get("name") or path,
+                    path=path,
+                    size_gb=size_gb,
+                    filesystem=filesystem,
+                    mountpoint=mountpoint,
+                    removable=removable,
+                    transport=transport or "unknown",
+                    ready=ready,
+                    status=status,
+                    recommended_action=action,
+                )
+            )
+
+        for child in item.get("children") or []:
+            add_item(child, item)
+
+    for device in payload.get("blockdevices", []):
+        add_item(device)
+
+    seen: set[str] = set()
+    unique = []
+    for source in sources:
+        if source.path in seen:
+            continue
+        seen.add(source.path)
+        unique.append(source)
+    return unique
+
+
 def require_paired_device(authorization: str = Header(default=""), x_vmnas_token: str = Header(default="")) -> None:
     token = x_vmnas_token.strip()
     if authorization.lower().startswith("bearer "):
@@ -217,6 +299,11 @@ def host_gpus() -> list[GpuDevice]:
 @app.get("/host/disks", response_model=list[HostDisk], dependencies=[Depends(require_paired_device)])
 def host_disks() -> list[HostDisk]:
     return detected_disks()
+
+
+@app.get("/storage/ingest-sources", response_model=list[StorageIngestSource], dependencies=[Depends(require_paired_device)])
+def storage_ingest_sources() -> list[StorageIngestSource]:
+    return detected_ingest_sources()
 
 
 @app.get("/host/compatibility", response_model=HostCompatibility, dependencies=[Depends(require_paired_device)])

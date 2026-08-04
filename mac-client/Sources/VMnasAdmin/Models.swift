@@ -67,6 +67,34 @@ struct HostDisk: Codable, Identifiable, Hashable {
     }
 }
 
+struct StorageIngestSource: Codable, Identifiable, Hashable {
+    let id: String
+    let name: String
+    let path: String
+    let sizeGb: Double
+    let filesystem: String
+    let mountpoint: String
+    let removable: Bool
+    let transport: String
+    let ready: Bool
+    let status: String
+    let recommendedAction: String
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case path
+        case sizeGb = "size_gb"
+        case filesystem
+        case mountpoint
+        case removable
+        case transport
+        case ready
+        case status
+        case recommendedAction = "recommended_action"
+    }
+}
+
 struct BenchmarkMetric: Codable, Identifiable, Hashable {
     var id: String { name }
     let name: String

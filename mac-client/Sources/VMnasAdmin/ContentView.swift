@@ -5,14 +5,14 @@ import CoreImage.CIFilterBuiltins
 
 enum AppSection: String, CaseIterable, Identifiable {
     case overview = "Overview"
-    case virtualMachines = "Virtual Machines"
-    case createVM = "Create VM"
+    case virtualMachines = "Virtual Computers"
+    case createVM = "New Virtual Computer"
     case windowsTuning = "Windows Tuning"
     case systemTest = "System Test"
-    case storage = "Storage"
-    case network = "Network"
+    case storage = "NAS & Storage"
+    case network = "Internet & Remote"
     case osStore = "OS Store"
-    case store = "Store"
+    case store = "Apps"
     case usbMaker = "Installer USB"
     case downloads = "Downloads"
     case settings = "Settings"
@@ -284,7 +284,7 @@ struct ContentView: View {
     private var overview: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                topBar(title: "Overview")
+                topBar(title: "Home")
 
                 if let error = api.errorMessage {
                     statusBanner(error)
@@ -302,33 +302,38 @@ struct ContentView: View {
                         metricTile("Updates", value: api.updateStatus?.running == true ? "Running" : (api.updateStatus?.status.capitalized ?? "Idle"), systemImage: "arrow.triangle.2.circlepath")
                     }
 
-                    HStack(alignment: .top, spacing: 18) {
-                        panel("Recommended NAS Preset") {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("\(api.nasPreset?.cpuVcpus ?? 4) vCPU")
-                                    .font(.title2.weight(.semibold))
-                                Text("\(api.nasPreset?.memoryGb ?? 8) GB RAM")
-                                    .font(.title2.weight(.semibold))
-                                Text(nasRecommendationText)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-
-                        panel("Quick Actions") {
-                            VStack(alignment: .leading, spacing: 10) {
-                            actionButton("Create VM", icon: "plus", section: .createVM)
-                            actionButton("Test Windows Tuning", icon: "switch.2", section: .windowsTuning)
-                            actionButton("Run System Test", icon: "checkmark.seal", section: .systemTest)
-                                actionButton("Open OS Store", icon: "opticaldiscdrive", section: .osStore)
-                                actionButton("Make Installer USB", icon: "externaldrive.badge.plus", section: .usbMaker)
-                                actionButton("Refresh Server", icon: "arrow.clockwise") {
-                                    Task { await refresh() }
-                                }
-                            }
-                        }
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: 14)], spacing: 14) {
+                        controlCard(
+                            title: "Run Storage",
+                            detail: nasRecommendationText,
+                            icon: "externaldrive.connected.to.line.below",
+                            primary: "Open NAS & Storage",
+                            section: .storage
+                        )
+                        controlCard(
+                            title: "Run Virtual Computers",
+                            detail: "Start, stop, view, snapshot, or create Windows, Linux, gaming, and NAS systems.",
+                            icon: "rectangle.stack",
+                            primary: "Open Computers",
+                            section: .virtualMachines
+                        )
+                        controlCard(
+                            title: "Install Apps",
+                            detail: "Add Plex, Jellyfin, Transmission, Docker, VPN, backups, and more from the server app store.",
+                            icon: "square.grid.2x2",
+                            primary: "Open Apps",
+                            section: .store
+                        )
+                        controlCard(
+                            title: "Stay Connected",
+                            detail: "Turn on secure remote access so paired devices can control the server away from home.",
+                            icon: "lock.shield",
+                            primary: "Remote Access",
+                            section: .network
+                        )
                     }
 
-                    panel("Recent Virtual Machines") {
+                    panel("Virtual Computers") {
                         vmTable(height: 220)
                     }
                 }
@@ -339,7 +344,7 @@ struct ContentView: View {
 
     private var virtualMachines: some View {
         VStack(alignment: .leading, spacing: 18) {
-            topBar(title: "Virtual Machines")
+            topBar(title: "Virtual Computers")
             vmTable(height: nil)
         }
         .padding(24)
@@ -410,7 +415,7 @@ struct ContentView: View {
     private var createVM: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                topBar(title: "Create VM")
+                topBar(title: "New Virtual Computer")
 
                 panel("Template") {
                     Picker("Type", selection: $selectedPresetName) {
@@ -422,7 +427,7 @@ struct ContentView: View {
                     .onChange(of: selectedPresetName) {
                         applySelectedPreset()
                     }
-                    TextField("VM name", text: $vmName)
+                    TextField("Name", text: $vmName)
                         .textFieldStyle(.roundedBorder)
                 }
 
@@ -505,7 +510,7 @@ struct ContentView: View {
                         selection = .store
                     }
                     .disabled(!api.isModuleStoreAvailable)
-                    Button("Create VM") {
+                    Button("Create") {
                         Task { await createSelectedVM() }
                     }
                         .buttonStyle(.borderedProminent)
@@ -630,30 +635,63 @@ struct ContentView: View {
     }
 
     private var storage: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            topBar(title: "Storage")
-            if api.disks.isEmpty {
-                panel("Detected Server Disks") {
-                    Text("No server disks detected yet.")
-                        .foregroundStyle(.secondary)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                topBar(title: "NAS & Storage")
+
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 14)], spacing: 14) {
+                    metricTile("Detected Drives", value: "\(api.disks.count)", systemImage: "internaldrive")
+                    metricTile("Import Drives", value: "\(api.ingestSources.filter(\.ready).count)", systemImage: "externaldrive.badge.plus")
+                    metricTile("Largest Drive", value: formatGb(api.disks.map(\.sizeGb).max() ?? 0), systemImage: "externaldrive")
                 }
-            } else {
-                HStack(spacing: 14) {
-                    metricTile("Detected Disks", value: "\(api.disks.count)", systemImage: "internaldrive")
-                    metricTile("Largest Disk", value: formatGb(api.disks.map(\.sizeGb).max() ?? 0), systemImage: "externaldrive")
-                    metricTile("Removable", value: "\(api.disks.filter(\.removable).count)", systemImage: "externaldrive.badge.questionmark")
+
+                panel("NAS Setup") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label("Start with the NAS preset, then add media apps from Apps.", systemImage: "folder.badge.gearshape")
+                            .font(.headline)
+                        Text("Plex, Jellyfin, Transmission, Samba shares, NFS shares, VPN, and Docker are installed from Apps so the server stays simple until you choose what you need.")
+                            .foregroundStyle(.secondary)
+                        HStack {
+                            actionButton("Create NAS", icon: "plus.rectangle.on.folder") {
+                                selectedPresetName = "nas"
+                                vmName = "nas-01"
+                                applySelectedPreset()
+                                selection = .createVM
+                            }
+                            actionButton("Media Apps", icon: "play.tv", section: .store, category: .apps)
+                            actionButton("File Sharing", icon: "person.2.wave.2", section: .store, category: .nas)
+                        }
+                    }
                 }
-                panel("Detected Server Disks") {
-                    diskList(api.disks)
+
+                panel("Plugged-In Drives For Import") {
+                    if api.ingestSources.isEmpty {
+                        Text("No USB or extra hard drives are ready for import yet. Plug in a drive on the server, then refresh.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ingestSourceList(api.ingestSources)
+                    }
+                }
+
+                panel("All Server Drives") {
+                    if api.disks.isEmpty {
+                        Text("No server disks detected yet.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        diskList(api.disks)
+                    }
                 }
             }
+            .padding(24)
         }
-        .padding(24)
+        .task {
+            await api.refreshCompatibility()
+        }
     }
 
     private var network: some View {
         VStack(alignment: .leading, spacing: 18) {
-            topBar(title: "Network")
+            topBar(title: "Internet & Remote")
             HStack(spacing: 14) {
                 metricTile("Bridge", value: "vmbr0", systemImage: "point.3.connected.trianglepath.dotted")
                 metricTile("Remote", value: api.remoteStatus?.authenticated == true ? "Ready" : "Off", systemImage: "lock.shield")
@@ -668,10 +706,10 @@ struct ContentView: View {
 
     private var store: some View {
         VStack(alignment: .leading, spacing: 18) {
-            topBar(title: "Module Store")
+            topBar(title: "Apps")
 
             HStack {
-                TextField("Search modules", text: $searchText)
+                TextField("Search apps", text: $searchText)
                     .textFieldStyle(.roundedBorder)
                 Picker("Category", selection: $selectedCategory) {
                     Text("All").tag(ModuleCategory?.none)
@@ -696,12 +734,12 @@ struct ContentView: View {
 
     private var lockedModuleStore: some View {
         VStack(alignment: .leading, spacing: 18) {
-            topBar(title: "Module Store")
+            topBar(title: "Apps")
             panel("Server Required") {
                 VStack(alignment: .leading, spacing: 12) {
-                    Label("Pair this Mac with a running VMnas server before using the Module Store.", systemImage: "lock.shield")
+                    Label("Pair this Mac with a running VMnas server before installing Apps.", systemImage: "lock.shield")
                         .font(.headline)
-                    Text("Modules install on the server, not on this Mac. Once the server is connected and paired, the store will appear in the sidebar.")
+                    Text("Apps install on the server, not on this Mac. Once the server is connected and paired, Apps will appear in the sidebar.")
                         .foregroundStyle(.secondary)
                     Button("Open Settings") {
                         selection = .settings
@@ -1558,6 +1596,34 @@ struct ContentView: View {
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
+    private func controlCard(title: String, detail: String, icon: String, primary: String, section: AppSection) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: icon)
+                    .font(.title2)
+                Spacer()
+            }
+            Text(title)
+                .font(.headline)
+            Text(detail)
+                .foregroundStyle(.secondary)
+                .lineLimit(4)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 4)
+            Button(primary) {
+                selection = section
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .frame(maxWidth: .infinity, minHeight: 190, alignment: .topLeading)
+        .padding(16)
+        .background(.background)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(.separator, lineWidth: 1)
+        )
+    }
+
     private func formatGb(_ value: Double) -> String {
         String(format: "%.1f GB", value)
     }
@@ -1957,6 +2023,41 @@ struct ContentView: View {
                     Spacer()
                     Text(formatGb(disk.sizeGb))
                         .foregroundStyle(.secondary)
+                }
+                .padding(12)
+                .background(.thinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+        }
+    }
+
+    private func ingestSourceList(_ sources: [StorageIngestSource]) -> some View {
+        VStack(spacing: 10) {
+            ForEach(sources) { source in
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: source.ready ? "checkmark.circle.fill" : "exclamationmark.circle")
+                        .foregroundStyle(source.ready ? .green : .orange)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(source.name.isEmpty ? source.path : source.name)
+                            .font(.headline)
+                        Text("\(source.status) · \(formatGb(source.sizeGb)) · \(source.transport.isEmpty ? "unknown" : source.transport)")
+                            .foregroundStyle(.secondary)
+                        if !source.mountpoint.isEmpty {
+                            Text("Mounted at \(source.mountpoint)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Text(source.recommendedAction)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Text(source.filesystem.isEmpty ? "Drive" : source.filesystem.uppercased())
+                        .font(.caption)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(.quaternary)
+                        .clipShape(Capsule())
                 }
                 .padding(12)
                 .background(.thinMaterial)
