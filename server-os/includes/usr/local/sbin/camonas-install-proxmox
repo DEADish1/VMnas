@@ -132,6 +132,25 @@ apt_get_target() {
     "$@"
 }
 
+boot_mode() {
+  if [[ -d /sys/firmware/efi ]]; then
+    echo "uefi"
+  else
+    echo "bios"
+  fi
+}
+
+target_bootloader_packages() {
+  case "$(boot_mode)" in
+    uefi)
+      echo "grub-efi-amd64"
+      ;;
+    *)
+      echo "grub-pc"
+      ;;
+  esac
+}
+
 set_admin_password_in_target() {
   if [[ -n "${ADMIN_PASSWORD}" ]]; then
     printf "%s:%s\n" "${ADMIN_USER}" "${ADMIN_PASSWORD}" | chroot "${TARGET_ROOT}" chpasswd
@@ -445,11 +464,14 @@ install_selected_modules_current() {
 
 install_proxmox_into_target() {
   phase "Installing Proxmox and Camo NAS services"
+  local boot_packages
+  boot_packages="$(target_bootloader_packages)"
+  echo "Detected $(boot_mode) boot. Installing bootloader package(s): ${boot_packages}"
   mount_target_systems
   trap unmount_target_systems EXIT
 
   apt_get_target update
-  apt_get_target install -y curl ca-certificates gnupg sudo openssh-server chrony open-iscsi postfix linux-image-amd64 grub-efi-amd64 grub-pc nftables openssl avahi-daemon
+  apt_get_target install -y curl ca-certificates gnupg sudo openssh-server chrony open-iscsi postfix linux-image-amd64 ${boot_packages} nftables openssl avahi-daemon
 
   run_in_target install -d -m 0755 /etc/apt/keyrings
   echo "Downloading Proxmox archive keyring from ${PROXMOX_KEY_URL}"
@@ -514,9 +536,13 @@ EOF
 EOF
 
   phase "Installing bootloader"
-  echo "Installing bootloader"
-  run_in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=Camo NAS --recheck || true
-  run_in_target grub-install --target=i386-pc "${TARGET_DISK}" --recheck || true
+  echo "Installing $(boot_mode) bootloader"
+  if [[ "$(boot_mode)" == "uefi" ]]; then
+    run_in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id="Camo NAS" --recheck \
+      || run_in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id="Camo NAS" --removable --no-nvram --recheck
+  else
+    run_in_target grub-install --target=i386-pc "${TARGET_DISK}" --recheck
+  fi
   run_in_target update-grub
   run_in_target update-initramfs -u -k all || true
 
