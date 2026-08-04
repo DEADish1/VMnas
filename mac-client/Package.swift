@@ -10,6 +10,11 @@ let package = Package(
         .executable(name: "CamoNASAdmin", targets: ["CamoNASAdmin"])
     ],
     targets: [
-        .executableTarget(name: "CamoNASAdmin")
+        .executableTarget(
+            name: "CamoNASAdmin",
+            resources: [
+                .copy("Resources")
+            ]
+        )
     ]
 )

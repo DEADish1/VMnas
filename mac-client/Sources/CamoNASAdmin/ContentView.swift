@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 import CoreImage.CIFilterBuiltins
@@ -14,6 +15,46 @@ private enum CamoNASTheme {
     static let accentSoft = Color(red: 0.45, green: 0.12, blue: 0.16)
     static let border = Color(red: 0.46, green: 0.36, blue: 0.40)
     static let textMuted = Color(red: 0.84, green: 0.82, blue: 0.83)
+}
+
+private struct CamoNASFabricBackground: View {
+    private static let textureImage: NSImage? = {
+        let resourceName = "camo-fabric-red"
+        let sourceResourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .appendingPathComponent("Resources/\(resourceName).png")
+        let candidateURLs = [
+            Bundle.main.url(forResource: resourceName, withExtension: "png"),
+            sourceResourceURL
+        ]
+        return candidateURLs.compactMap { $0 }.compactMap(NSImage.init(contentsOf:)).first
+    }()
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack {
+                if let image = Self.textureImage {
+                    Image(nsImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: proxy.size.width, height: proxy.size.height)
+                        .clipped()
+                } else {
+                    CamoNASPanelBackground(seed: 12_420_002)
+                }
+                Color.black.opacity(0.08)
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.04),
+                        Color.clear,
+                        Color.black.opacity(0.18)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+        }
+    }
 }
 
 private struct CamoNASPanelBackground: View {
@@ -393,9 +434,9 @@ struct ContentView: View {
             .background(CamoNASTheme.sidebar)
         } detail: {
             ZStack(alignment: .bottomTrailing) {
-                CamoNASPanelBackground(seed: 12_420_002)
+                CamoNASFabricBackground()
                     .ignoresSafeArea()
-                CamoNASTheme.window.opacity(0.12).ignoresSafeArea()
+                CamoNASTheme.window.opacity(0.06).ignoresSafeArea()
                 content
                 if let liveVM, let liveURL {
                     liveVMOverlay(vm: liveVM, url: liveURL)
@@ -1500,7 +1541,7 @@ struct ContentView: View {
         }
         .padding(24)
         .scrollContentBackground(.hidden)
-        .background(CamoNASTheme.window)
+        .background(Color.black.opacity(0.24))
         .navigationTitle("Settings")
     }
 

@@ -46,6 +46,9 @@ mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 echo "Packaging binary: $BINARY"
 ditto --norsrc "$BINARY" "$MACOS_DIR/CamoNASAdmin"
 ditto --norsrc "$CLIENT_DIR/Packaging/Info.plist" "$APP_DIR/Contents/Info.plist"
+if [ -d "$CLIENT_DIR/Sources/CamoNASAdmin/Resources" ]; then
+  ditto --norsrc "$CLIENT_DIR/Sources/CamoNASAdmin/Resources" "$RESOURCES_DIR"
+fi
 chmod +x "$MACOS_DIR/CamoNASAdmin"
 
 if [ -f "$ROOT/dist/camonas-server-trixie-amd64.iso" ]; then

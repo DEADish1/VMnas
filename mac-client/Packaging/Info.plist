@@ -22,6 +22,8 @@
   <string>14.0</string>
   <key>NSHighResolutionCapable</key>
   <true/>
+  <key>NSQuitAlwaysKeepsWindows</key>
+  <false/>
   <key>NSDesktopFolderUsageDescription</key>
   <string>Camo NAS Admin needs access to selected ISO and IMG files on Desktop when creating installer media.</string>
   <key>NSDocumentsFolderUsageDescription</key>
