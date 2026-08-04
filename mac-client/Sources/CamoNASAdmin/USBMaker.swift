@@ -77,7 +77,12 @@ enum USBMaker {
             needsSudo: false,
             cleanupPath: nil
         )
-        let script = "do shell script \(appleScriptQuote(shell)) with administrator privileges"
+        let scriptURL = prepared.stagingRoot.appendingPathComponent("write-camonas-installer.command")
+        try shell.write(to: scriptURL, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptURL.path)
+
+        let command = "/bin/bash \(shellQuote(scriptURL.path))"
+        let script = "do shell script \(appleScriptQuote(command)) with administrator privileges"
         do {
             _ = try await run("/usr/bin/osascript", arguments: ["-e", script], timeout: 0)
         } catch {
