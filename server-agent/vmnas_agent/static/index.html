@@ -859,9 +859,10 @@
             <div class="item">
               <div>
                 <h3>${esc(disk.model || disk.name)}</h3>
-                <p>${esc(disk.path)} - ${formatGb(disk.size_gb)} - ${esc(disk.transport || "drive")}</p>
+                <p>${esc(disk.path)} - ${formatGb(disk.size_gb)} - ${esc(disk.drive_kind || disk.transport || "drive")}</p>
+                ${(disk.mountpoints || []).length ? `<p>Mounted: ${esc(disk.mountpoints.join(", "))}</p>` : ""}
               </div>
-              <span class="badge ${disk.removable ? "warn" : "good"}">${disk.removable ? "Removable" : "Internal"}</span>
+              <span class="badge ${disk.import_eligible ? "good" : disk.removable ? "warn" : ""}">${disk.import_eligible ? "Import source" : disk.removable ? "Needs mount" : "Server drive"}</span>
             </div>
           `).join("") : `<div class="message">No drives were reported yet.</div>`;
         }
@@ -870,7 +871,9 @@
             <div class="item">
               <div>
                 <h3>${esc(source.name)}</h3>
-                <p>${esc(source.status || source.path)} - ${formatGb(source.size_gb)}${source.recommended_action ? ` - ${esc(source.recommended_action)}` : ""}</p>
+                <p>${esc(source.status || source.path)} - ${formatGb(source.size_gb)} - ${esc(source.source_type || source.transport || "drive")} - ${esc(source.filesystem || "unknown filesystem")}</p>
+                ${source.mountpoint ? `<p>Mounted at ${esc(source.mountpoint)}</p>` : ""}
+                ${source.recommended_action ? `<p>${esc(source.recommended_action)}</p>` : ""}
               </div>
               <span class="badge ${source.ready ? "good" : "warn"}">${source.ready ? "Ready" : "Needs setup"}</span>
             </div>

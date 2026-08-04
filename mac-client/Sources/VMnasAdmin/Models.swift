@@ -53,7 +53,9 @@ struct HostDisk: Codable, Identifiable, Hashable {
     let sizeGb: Double
     let model: String
     let transport: String
+    let driveKind: String
     let removable: Bool
+    let importEligible: Bool
     let mountpoints: [String]
 
     enum CodingKeys: String, CodingKey {
@@ -62,7 +64,9 @@ struct HostDisk: Codable, Identifiable, Hashable {
         case sizeGb = "size_gb"
         case model
         case transport
+        case driveKind = "drive_kind"
         case removable
+        case importEligible = "import_eligible"
         case mountpoints
     }
 }
@@ -73,9 +77,11 @@ struct StorageIngestSource: Codable, Identifiable, Hashable {
     let path: String
     let sizeGb: Double
     let filesystem: String
+    let label: String
     let mountpoint: String
     let removable: Bool
     let transport: String
+    let sourceType: String
     let ready: Bool
     let status: String
     let recommendedAction: String
@@ -86,9 +92,11 @@ struct StorageIngestSource: Codable, Identifiable, Hashable {
         case path
         case sizeGb = "size_gb"
         case filesystem
+        case label
         case mountpoint
         case removable
         case transport
+        case sourceType = "source_type"
         case ready
         case status
         case recommendedAction = "recommended_action"

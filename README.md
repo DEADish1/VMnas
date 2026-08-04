@@ -358,6 +358,10 @@ Current OS Store families:
 
 Downloaded Linux media can be launched into the `Create VM` screen from the OS Store. VMnas preselects the downloaded installer media so the user can size the VM and create it without manually hunting for the file path. ISO media is attached as a CD-ROM installer; IMG media, including SteamOS images decompressed from `.img.bz2`, is imported as the VM boot disk.
 
+## Server Drive Import
+
+The server agent detects internal drives, USB flash drives, USB hard drives, and mounted extra storage drives. The Mac client and server web UI show which drives are safe import sources, whether they are mounted, their filesystem, their size, and the next simple action. VMnas does not reformat plugged-in import drives; it treats them as sources for copying media, ISOs, backups, and other files into the NAS library.
+
 ## Installer USB
 
 The Mac client includes an `Installer USB` screen for preparing the server installer with as few steps as possible. This utility runs on the Mac and is available before pairing with a server. It automatically checks for `dist/vmnas-server-trixie-amd64.iso` and loads the VMnas server ISO into the installer field when present. If the ISO has not been built yet, the screen includes a `Build Server ISO` action. The USB boots the VMnas server installer first, always adds a writable `VMNAS_LOGS` report partition for failed install diagnostics, then can add a separate `VMNAS_ISOS` library partition with extra guest OS media for the installed server to import:

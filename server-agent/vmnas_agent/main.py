@@ -71,11 +71,63 @@ def detected_virtualization() -> str:
     return "Unknown"
 
 
+def lsblk_bool(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return value != 0
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "y"}
+    return False
+
+
+def disk_mountpoints(item: dict) -> list[str]:
+    points = [value for value in item.get("mountpoints") or [] if value]
+    if item.get("mountpoint"):
+        points.append(item["mountpoint"])
+    for child in item.get("children") or []:
+        points.extend(disk_mountpoints(child))
+    return sorted(set(points))
+
+
+def system_mountpoint(mountpoint: str) -> bool:
+    return mountpoint in {"/", "/boot", "/boot/efi"} or mountpoint.startswith("/run/live") or mountpoint.startswith("/cdrom")
+
+
+def user_mountpoint(mountpoint: str) -> bool:
+    return mountpoint.startswith(("/media", "/mnt", "/run/media", "/Volumes"))
+
+
+def drive_kind(transport: str, removable: bool, size_gb: float) -> str:
+    normalized = transport.lower()
+    if normalized == "usb" and 0 < size_gb <= 128:
+        return "USB flash drive"
+    if normalized == "usb":
+        return "USB hard drive"
+    if removable:
+        return "removable drive"
+    if normalized in {"sata", "ata", "scsi"}:
+        return "hard drive"
+    if normalized == "nvme":
+        return "NVMe drive"
+    return "drive"
+
+
+def import_candidate(item_type: str, path: str, removable: bool, transport: str, mountpoints: list[str]) -> bool:
+    if item_type not in {"part", "disk"} or not path:
+        return False
+    if any(system_mountpoint(point) for point in mountpoints):
+        return False
+    if removable or transport.lower() == "usb":
+        return True
+    return any(user_mountpoint(point) for point in mountpoints)
+
+
 def detected_disks() -> list[HostDisk]:
     lsblk = Path("/usr/bin/lsblk")
     if lsblk.exists():
         result = subprocess.run(
-            [str(lsblk), "--json", "--bytes", "--output", "NAME,PATH,SIZE,MODEL,TYPE,TRAN,RM,MOUNTPOINTS"],
+            [str(lsblk), "--json", "--bytes", "--output", "NAME,PATH,SIZE,MODEL,TYPE,TRAN,RM,HOTPLUG,FSTYPE,MOUNTPOINT,MOUNTPOINTS"],
             check=False,
             text=True,
             capture_output=True,
@@ -86,15 +138,20 @@ def detected_disks() -> list[HostDisk]:
             for item in payload.get("blockdevices", []):
                 if item.get("type") != "disk":
                     continue
-                mountpoints = [value for value in item.get("mountpoints") or [] if value]
+                mountpoints = disk_mountpoints(item)
+                removable = lsblk_bool(item.get("rm")) or lsblk_bool(item.get("hotplug"))
+                transport = item.get("tran") or "unknown"
+                size_gb = round(int(item.get("size") or 0) / 1000 / 1000 / 1000, 1)
                 disks.append(
                     HostDisk(
                         name=item.get("name", ""),
                         path=item.get("path", ""),
-                        size_gb=round(int(item.get("size") or 0) / 1000 / 1000 / 1000, 1),
+                        size_gb=size_gb,
                         model=item.get("model") or "Unknown disk",
-                        transport=item.get("tran") or "unknown",
-                        removable=bool(item.get("rm")),
+                        transport=transport,
+                        drive_kind=drive_kind(transport, removable, size_gb),
+                        removable=removable,
+                        import_eligible=import_candidate("disk", item.get("path", ""), removable, transport, mountpoints),
                         mountpoints=mountpoints,
                     )
                 )
@@ -128,7 +185,9 @@ def detected_disks() -> list[HostDisk]:
                 size_gb=round(int(detail.get("TotalSize") or 0) / 1000 / 1000 / 1000, 1),
                 model=detail.get("MediaName") or "Unknown disk",
                 transport=detail.get("BusProtocol") or "unknown",
+                drive_kind=drive_kind(detail.get("BusProtocol") or "unknown", bool(detail.get("RemovableMedia") or detail.get("Ejectable")), round(int(detail.get("TotalSize") or 0) / 1000 / 1000 / 1000, 1)),
                 removable=bool(detail.get("RemovableMedia") or detail.get("Ejectable")),
+                import_eligible=bool(detail.get("RemovableMedia") or detail.get("Ejectable")),
                 mountpoints=[],
             )
         )
@@ -140,7 +199,7 @@ def detected_ingest_sources() -> list[StorageIngestSource]:
     if not lsblk.exists():
         return []
     result = subprocess.run(
-        [str(lsblk), "--json", "--bytes", "--output", "NAME,PATH,SIZE,MODEL,TYPE,TRAN,RM,FSTYPE,MOUNTPOINTS"],
+        [str(lsblk), "--json", "--bytes", "--output", "NAME,PATH,LABEL,SIZE,MODEL,TYPE,TRAN,RM,HOTPLUG,FSTYPE,MOUNTPOINT,MOUNTPOINTS"],
         check=False,
         text=True,
         capture_output=True,
@@ -158,14 +217,17 @@ def detected_ingest_sources() -> list[StorageIngestSource]:
     def add_item(item: dict, parent: dict | None = None) -> None:
         item_type = item.get("type") or ""
         path = item.get("path") or ""
-        mountpoints = [value for value in item.get("mountpoints") or [] if value]
+        mountpoints = disk_mountpoints(item)
         mountpoint = mountpoints[0] if mountpoints else ""
-        removable = bool(item.get("rm") or (parent or {}).get("rm"))
+        removable = lsblk_bool(item.get("rm")) or lsblk_bool(item.get("hotplug")) or lsblk_bool((parent or {}).get("rm")) or lsblk_bool((parent or {}).get("hotplug"))
         transport = item.get("tran") or (parent or {}).get("tran") or ""
         filesystem = item.get("fstype") or ""
+        label = item.get("label") or ""
         size_gb = round(int(item.get("size") or 0) / 1000 / 1000 / 1000, 1)
-        is_system = any(point in {"/", "/boot", "/boot/efi"} for point in mountpoints)
-        is_candidate = item_type in {"part", "disk"} and path and (removable or transport in {"usb", "sata", "ata", "nvme"} or mountpoint.startswith("/media") or mountpoint.startswith("/mnt"))
+        is_system = any(system_mountpoint(point) for point in mountpoints)
+        has_children = bool(item.get("children"))
+        is_candidate = import_candidate(item_type, path, removable, transport, mountpoints) and not (item_type == "disk" and has_children)
+        source_type = drive_kind(transport, removable, size_gb)
 
         if is_candidate:
             if is_system:
@@ -174,27 +236,29 @@ def detected_ingest_sources() -> list[StorageIngestSource]:
                 ready = False
             elif mountpoint:
                 status = "Ready"
-                action = "Open this drive in the NAS import screen."
+                action = "Ready to copy into the NAS library."
                 ready = True
             elif filesystem:
                 status = "Needs mount"
-                action = "Mount this drive, then refresh."
+                action = "Mount this drive on the server, then refresh."
                 ready = False
             else:
                 status = "No readable filesystem"
-                action = "Use a drive formatted as exFAT, NTFS, FAT32, or a Linux filesystem."
+                action = "Use exFAT, NTFS, FAT32, APFS read support, or a Linux filesystem."
                 ready = False
 
             sources.append(
                 StorageIngestSource(
                     id=path,
-                    name=item.get("model") or item.get("name") or path,
+                    name=label or item.get("model") or (parent or {}).get("model") or item.get("name") or path,
                     path=path,
                     size_gb=size_gb,
                     filesystem=filesystem,
+                    label=label,
                     mountpoint=mountpoint,
                     removable=removable,
                     transport=transport or "unknown",
+                    source_type=source_type,
                     ready=ready,
                     status=status,
                     recommended_action=action,

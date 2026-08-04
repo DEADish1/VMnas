@@ -62,7 +62,9 @@ class HostDisk(BaseModel):
     size_gb: float
     model: str = ""
     transport: str = ""
+    drive_kind: str = "drive"
     removable: bool = False
+    import_eligible: bool = False
     mountpoints: list[str] = []
 
 
@@ -72,9 +74,11 @@ class StorageIngestSource(BaseModel):
     path: str
     size_gb: float
     filesystem: str = ""
+    label: str = ""
     mountpoint: str = ""
     removable: bool = False
     transport: str = ""
+    source_type: str = "drive"
     ready: bool = False
     status: str = ""
     recommended_action: str = ""

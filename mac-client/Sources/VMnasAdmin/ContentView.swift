@@ -642,6 +642,7 @@ struct ContentView: View {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 14)], spacing: 14) {
                     metricTile("Detected Drives", value: "\(api.disks.count)", systemImage: "internaldrive")
                     metricTile("Import Drives", value: "\(api.ingestSources.filter(\.ready).count)", systemImage: "externaldrive.badge.plus")
+                    metricTile("USB Drives", value: "\(api.disks.filter { $0.transport.lowercased() == "usb" || $0.removable }.count)", systemImage: "externaldrive.connected.to.line.below")
                     metricTile("Largest Drive", value: formatGb(api.disks.map(\.sizeGb).max() ?? 0), systemImage: "externaldrive")
                 }
 
@@ -666,7 +667,7 @@ struct ContentView: View {
 
                 panel("Plugged-In Drives For Import") {
                     if api.ingestSources.isEmpty {
-                        Text("No USB or extra hard drives are ready for import yet. Plug in a drive on the server, then refresh.")
+                        Text("No USB flash drives or external hard drives are ready for import yet. Plug a drive into the server, then refresh.")
                             .foregroundStyle(.secondary)
                     } else {
                         ingestSourceList(api.ingestSources)
@@ -2013,16 +2014,29 @@ struct ContentView: View {
         VStack(spacing: 10) {
             ForEach(disks) { disk in
                 HStack {
-                    Image(systemName: disk.removable ? "externaldrive" : "internaldrive")
+                    Image(systemName: disk.removable || disk.transport.lowercased() == "usb" ? "externaldrive" : "internaldrive")
                     VStack(alignment: .leading, spacing: 4) {
                         Text(disk.model.isEmpty ? disk.name : disk.model)
                             .font(.headline)
-                        Text("\(disk.path) · \(disk.transport.isEmpty ? "unknown" : disk.transport)")
+                        Text("\(disk.path) - \(disk.driveKind) - \(disk.transport.isEmpty ? "unknown" : disk.transport)")
                             .foregroundStyle(.secondary)
+                        if !disk.mountpoints.isEmpty {
+                            Text("Mounted: \(disk.mountpoints.joined(separator: ", "))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                     Spacer()
-                    Text(formatGb(disk.sizeGb))
-                        .foregroundStyle(.secondary)
+                    VStack(alignment: .trailing, spacing: 6) {
+                        Text(formatGb(disk.sizeGb))
+                            .foregroundStyle(.secondary)
+                        Text(disk.importEligible ? "Import source" : (disk.removable ? "Needs mount" : "Server drive"))
+                            .font(.caption)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(disk.importEligible ? Color.green.opacity(0.16) : Color.secondary.opacity(0.12))
+                            .clipShape(Capsule())
+                    }
                 }
                 .padding(12)
                 .background(.thinMaterial)
@@ -2040,7 +2054,7 @@ struct ContentView: View {
                     VStack(alignment: .leading, spacing: 5) {
                         Text(source.name.isEmpty ? source.path : source.name)
                             .font(.headline)
-                        Text("\(source.status) · \(formatGb(source.sizeGb)) · \(source.transport.isEmpty ? "unknown" : source.transport)")
+                        Text("\(source.status) - \(source.sourceType) - \(formatGb(source.sizeGb)) - \(source.transport.isEmpty ? "unknown" : source.transport)")
                             .foregroundStyle(.secondary)
                         if !source.mountpoint.isEmpty {
                             Text("Mounted at \(source.mountpoint)")
@@ -2052,12 +2066,17 @@ struct ContentView: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Text(source.filesystem.isEmpty ? "Drive" : source.filesystem.uppercased())
-                        .font(.caption)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(.quaternary)
-                        .clipShape(Capsule())
+                    VStack(alignment: .trailing, spacing: 6) {
+                        Text(source.filesystem.isEmpty ? "Drive" : source.filesystem.uppercased())
+                            .font(.caption)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(.quaternary)
+                            .clipShape(Capsule())
+                        Text(source.ready ? "Can import" : "Not ready")
+                            .font(.caption)
+                            .foregroundStyle(source.ready ? .green : .orange)
+                    }
                 }
                 .padding(12)
                 .background(.thinMaterial)
