@@ -260,5 +260,8 @@ class SnapshotSummary(BaseModel):
 class DiscoveryInfo(BaseModel):
     name: str = "VMnas"
     api_url: str
+    urls: list[str] = []
+    pairing_url: str = ""
+    web_url: str = ""
     mdns_name: str = "vmnas.local"
     services: list[str] = ["_vmnas._tcp", "_https._tcp"]

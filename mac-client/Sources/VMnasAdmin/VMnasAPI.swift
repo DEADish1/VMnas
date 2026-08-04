@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 @MainActor
@@ -26,6 +27,9 @@ final class VMnasAPI: ObservableObject {
     @Published var deviceToken: String?
     @Published var isServerReachable = false
     @Published var isConnected = false
+    @Published var isDiscoveringServer = false
+    @Published var connectionMessage = "Click Find Server, then enter the pairing code shown on the VMnas server."
+    @Published var discoveredURLs: [String] = []
     @Published var errorMessage: String?
 
     var isModuleStoreAvailable: Bool {
@@ -56,6 +60,14 @@ final class VMnasAPI: ObservableObject {
         configuration.timeoutIntervalForResource = 12
         return URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
     }()
+    private let discoverySession: URLSession = {
+        let delegate = VMnasURLSessionDelegate()
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 0.85
+        configuration.timeoutIntervalForResource = 1.2
+        configuration.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        return URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
+    }()
 
     func refresh() async {
         loadTokenIfNeeded()
@@ -64,6 +76,7 @@ final class VMnasAPI: ObservableObject {
             let pairing: PairingStatus = try await get("/pairing/status")
             self.pairingStatus = pairing
             self.isServerReachable = true
+            self.connectionMessage = deviceToken == nil ? "Server found. Enter the pairing code to connect this Mac." : "Server found."
 
             guard deviceToken != nil else {
                 clearAdminData()
@@ -74,6 +87,7 @@ final class VMnasAPI: ObservableObject {
             let resources: HostResources = try await get("/host/resources")
             self.resources = resources
             self.isConnected = true
+            self.connectionMessage = "Paired and connected."
             self.errorMessage = nil
 
             async let compatibility: HostCompatibility? = getOptional("/host/compatibility")
@@ -123,8 +137,33 @@ final class VMnasAPI: ObservableObject {
         } catch {
             self.isServerReachable = false
             clearAdminData()
+            if !isDiscoveringServer {
+                self.connectionMessage = "Could not reach a VMnas server. Click Find Server or type the server address from the VMnas screen."
+            }
             self.errorMessage = error.localizedDescription
         }
+    }
+
+    func findServer() async {
+        isDiscoveringServer = true
+        connectionMessage = "Looking for VMnas on this network..."
+        errorMessage = nil
+        defer { isDiscoveringServer = false }
+
+        let candidates = discoveryCandidates()
+        discoveredURLs = candidates
+
+        if let found = await firstReachableServer(in: candidates) {
+            serverBaseURL = found
+            deviceToken = KeychainStore.readToken(serverURL: serverBaseURL)
+            connectionMessage = "Server found at \(serverBaseURL). Enter the pairing code to connect."
+            await refresh()
+            return
+        }
+
+        isServerReachable = false
+        clearAdminData()
+        connectionMessage = "No VMnas server was found automatically. Make sure this Mac is on the same network, or type the address shown on the server."
     }
 
     func proxmoxURL() -> URL? {
@@ -194,15 +233,20 @@ final class VMnasAPI: ObservableObject {
 
     func pair(deviceName: String, pin: String) async {
         do {
+            if !isServerReachable {
+                await findServer()
+            }
             let response: PairingResponse = try await postJSON(
                 "/pairing/pair",
                 body: ["device_name": deviceName, "pin": pin]
             )
             self.deviceToken = response.token
             KeychainStore.saveToken(response.token, serverURL: serverBaseURL)
+            self.connectionMessage = "Paired. This Mac can now control the VMnas server."
             await refresh()
         } catch {
             self.errorMessage = error.localizedDescription
+            self.connectionMessage = "Pairing did not work. Check the code shown on the server and try again."
         }
     }
 
@@ -452,6 +496,107 @@ final class VMnasAPI: ObservableObject {
         isConnected = false
     }
 
+    private func firstReachableServer(in candidates: [String]) async -> String? {
+        await withTaskGroup(of: String?.self) { group in
+            for candidate in candidates {
+                group.addTask { [discoverySession, decoder] in
+                    guard let url = URL(string: "/pairing/status", relativeTo: Self.normalizedURL(from: candidate)) else {
+                        return nil
+                    }
+                    do {
+                        let (data, response) = try await discoverySession.data(from: url)
+                        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                            return nil
+                        }
+                        _ = try decoder.decode(PairingStatus.self, from: data)
+                        return Self.normalizedURL(from: candidate)?.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                    } catch {
+                        return nil
+                    }
+                }
+            }
+
+            for await result in group {
+                if let result {
+                    group.cancelAll()
+                    return result
+                }
+            }
+            return nil
+        }
+    }
+
+    private func discoveryCandidates() -> [String] {
+        var candidates = [
+            serverBaseURL,
+            "https://vmnas.local:8765",
+            "https://vmnas:8765",
+            "https://10.0.0.2:8765",
+            "https://10.0.2.15:8765"
+        ]
+        for prefix in localIPv4Prefixes() {
+            candidates.append("https://\(prefix).1:8765")
+            for host in 2...254 {
+                candidates.append("https://\(prefix).\(host):8765")
+            }
+        }
+        var seen = Set<String>()
+        return candidates.compactMap { candidate in
+            guard let normalized = Self.normalizedURL(from: candidate)?.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/")) else {
+                return nil
+            }
+            guard !seen.contains(normalized) else {
+                return nil
+            }
+            seen.insert(normalized)
+            return normalized
+        }
+    }
+
+    private func localIPv4Prefixes() -> [String] {
+        var interfaces: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&interfaces) == 0, let first = interfaces else {
+            return []
+        }
+        defer { freeifaddrs(interfaces) }
+
+        var prefixes: [String] = []
+        var pointer: UnsafeMutablePointer<ifaddrs>? = first
+        while pointer != nil {
+            defer { pointer = pointer?.pointee.ifa_next }
+            guard let address = pointer?.pointee.ifa_addr, address.pointee.sa_family == UInt8(AF_INET) else {
+                continue
+            }
+            let flags = Int32(pointer?.pointee.ifa_flags ?? 0)
+            guard (flags & IFF_LOOPBACK) == 0 else {
+                continue
+            }
+            var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+            let result = getnameinfo(
+                address,
+                socklen_t(address.pointee.sa_len),
+                &hostname,
+                socklen_t(hostname.count),
+                nil,
+                0,
+                NI_NUMERICHOST
+            )
+            guard result == 0 else {
+                continue
+            }
+            let ip = String(cString: hostname)
+            guard !ip.hasPrefix("127."), !ip.hasPrefix("169.254.") else {
+                continue
+            }
+            let parts = ip.split(separator: ".")
+            guard parts.count == 4 else {
+                continue
+            }
+            prefixes.append(parts.prefix(3).joined(separator: "."))
+        }
+        return Array(Set(prefixes)).sorted()
+    }
+
     private func getOptional<T: Decodable>(_ path: String) async -> T? {
         do {
             return try await get(path)
@@ -614,7 +759,11 @@ final class VMnasAPI: ObservableObject {
     }
 
     private func normalizedBaseURL() -> URL? {
-        var value = serverBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        Self.normalizedURL(from: serverBaseURL)
+    }
+
+    nonisolated private static func normalizedURL(from rawValue: String) -> URL? {
+        var value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else { return nil }
         if !value.contains("://") {
             value = "https://\(value)"

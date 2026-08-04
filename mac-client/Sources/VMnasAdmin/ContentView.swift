@@ -1131,14 +1131,26 @@ struct ContentView: View {
     private var settings: some View {
         Form {
             Section("Server") {
-                TextField("VMnas server address", text: $api.serverBaseURL)
-                Text("Use the server's LAN IP from the VMnas screen, like 192.168.1.50. The app will add the secure VMnas port automatically.")
+                Label(api.isConnected ? "Connected to VMnas" : api.isServerReachable ? "Server found" : "Find your VMnas server", systemImage: api.isConnected ? "checkmark.shield.fill" : api.isServerReachable ? "link.badge.plus" : "dot.radiowaves.left.and.right")
+                    .font(.headline)
+                Text(api.connectionMessage)
+                    .foregroundStyle(.secondary)
+                HStack {
+                    Button(api.isDiscoveringServer ? "Looking..." : "Find Server") {
+                        Task { await api.findServer() }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(api.isDiscoveringServer)
+                    Button("Refresh") {
+                        Task { await refresh() }
+                    }
+                    .disabled(api.isDiscoveringServer)
+                }
+                TextField("Server address", text: $api.serverBaseURL)
+                Text("Usually you can click Find Server. If that does not work, type the address shown on the VMnas server screen.")
                     .foregroundStyle(.secondary)
                 LabeledContent("Server", value: api.isServerReachable ? "Reachable" : "Not reachable")
                 LabeledContent("Admin", value: api.isConnected ? "Paired and connected" : "Not paired")
-                Button("Refresh Connection") {
-                    Task { await refresh() }
-                }
             }
             Section("Server Modules") {
                 LabeledContent("Module Store", value: api.isModuleStoreAvailable ? "Unlocked" : "Locked")
@@ -1193,16 +1205,17 @@ struct ContentView: View {
                     LabeledContent("Paired devices", value: "\(status.pairedDevices)")
                 }
                 TextField("Device name", text: $deviceName)
-                SecureField("6-digit PIN", text: $pairingPin)
-                Button(api.deviceToken == nil ? "Pair Device" : "Paired") {
+                SecureField("Pairing code from server", text: $pairingPin)
+                Button(api.deviceToken == nil ? "Connect This Mac" : "Connected") {
                     Task {
                         await api.pair(deviceName: deviceName, pin: pairingPin)
                         pairingPin = ""
                     }
                 }
-                .disabled(pairingPin.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || api.deviceToken != nil)
+                .buttonStyle(.borderedProminent)
+                .disabled(pairingPin.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || api.deviceToken != nil || api.isDiscoveringServer)
                 if api.deviceToken != nil {
-                    Label("Secure control token saved in Keychain", systemImage: "key.fill")
+                    Label("This Mac is paired. Secure access is saved in Keychain.", systemImage: "key.fill")
                         .foregroundStyle(.green)
                 }
                 HStack {
@@ -1537,12 +1550,13 @@ struct ContentView: View {
 
     private func pairingQRCode() -> NSImage? {
         let baseURL = api.serverBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let urls = Array(Set(([baseURL] + api.discoveredURLs).filter { !$0.isEmpty })).sorted()
         let payload: [String: Any] = [
             "type": "vmnas-pairing",
             "version": 1,
             "server_name": "VMnas Server",
             "api_url": baseURL,
-            "urls": [baseURL],
+            "urls": urls,
             "pin": api.latestPairingPin ?? pairingPin,
             "pair_endpoint": "/pairing/pair",
             "status_endpoint": "/pairing/status",

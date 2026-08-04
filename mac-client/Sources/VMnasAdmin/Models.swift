@@ -432,6 +432,26 @@ struct PairingPinResponse: Codable {
     let pin: String
 }
 
+struct DiscoveryInfo: Codable {
+    let name: String
+    let apiUrl: String
+    let urls: [String]
+    let pairingUrl: String
+    let webUrl: String
+    let mdnsName: String
+    let services: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case apiUrl = "api_url"
+        case urls
+        case pairingUrl = "pairing_url"
+        case webUrl = "web_url"
+        case mdnsName = "mdns_name"
+        case services
+    }
+}
+
 enum ModuleCategory: String, CaseIterable, Identifiable, Codable {
     case nas = "NAS"
     case virtualMachines = "VM Tools"

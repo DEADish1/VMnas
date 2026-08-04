@@ -123,6 +123,21 @@ def import_candidate(item_type: str, path: str, removable: bool, transport: str,
     return any(user_mountpoint(point) for point in mountpoints)
 
 
+def local_ipv4_addresses() -> list[str]:
+    addresses: list[str] = []
+    for name, values in psutil.net_if_addrs().items():
+        if name.startswith(("lo", "docker", "veth", "br-")):
+            continue
+        for value in values:
+            if value.family.name != "AF_INET":
+                continue
+            address = value.address
+            if address.startswith(("127.", "169.254.")):
+                continue
+            addresses.append(address)
+    return sorted(set(addresses))
+
+
 def detected_disks() -> list[HostDisk]:
     lsblk = Path("/usr/bin/lsblk")
     if lsblk.exists():
@@ -303,7 +318,15 @@ def browser_client() -> FileResponse:
 
 @app.get("/discovery", response_model=DiscoveryInfo)
 def discovery() -> DiscoveryInfo:
-    return DiscoveryInfo(api_url="https://vmnas.local:8765")
+    urls = ["https://vmnas.local:8765", "https://vmnas:8765"]
+    urls.extend([f"https://{address}:8765" for address in local_ipv4_addresses()])
+    unique_urls = list(dict.fromkeys(urls))
+    return DiscoveryInfo(
+        api_url=unique_urls[0],
+        urls=unique_urls,
+        pairing_url="/pairing/pair",
+        web_url=unique_urls[0],
+    )
 
 
 @app.get("/pairing/status", response_model=PairingStatus)
