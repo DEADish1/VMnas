@@ -1815,7 +1815,22 @@ struct ContentView: View {
             usbStatus = "Done. The Camo NAS installer boots first, CAMONAS_LOGS will collect install reports, and \(usbExtraIsoURLs.count) guest media file(s) were staged for server import."
             await refreshUSBDevices()
         } catch {
-            usbStatus = error.localizedDescription
+            let message = error.localizedDescription
+            if message.contains("Operation not permitted") || message.contains("Full Disk Access") || message.contains("macOS blocked") {
+                do {
+                    let script = try await USBMaker.createTerminalWriter(
+                        isoPath: usbIsoPath.trimmingCharacters(in: .whitespacesAndNewlines),
+                        extraIsoPaths: usbExtraIsoURLs.map(\.path),
+                        device: device
+                    )
+                    NSWorkspace.shared.open(script)
+                    usbStatus = "macOS blocked the in-app USB write, so Camo NAS opened the Terminal writer instead. In the Terminal window, enter your Mac password if asked. If it is still blocked, give Terminal Full Disk Access, then run the same writer again."
+                } catch {
+                    usbStatus = "\(message)\n\nCould not open the Terminal writer: \(error.localizedDescription)"
+                }
+            } else {
+                usbStatus = message
+            }
         }
         isWritingUSB = false
     }
