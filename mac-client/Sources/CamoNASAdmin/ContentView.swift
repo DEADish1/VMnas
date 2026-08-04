@@ -25,7 +25,7 @@ private struct CamoNASPanelBackground: View {
 
     var body: some View {
         ZStack {
-            CamoNASTheme.panel
+            Color(red: 0.045, green: 0.045, blue: 0.045)
             GeometryReader { proxy in
                 let width = proxy.size.width
                 let height = proxy.size.height
@@ -38,8 +38,8 @@ private struct CamoNASPanelBackground: View {
                 }
                 LinearGradient(
                     colors: [
-                        Color.black.opacity(0.04),
-                        Color.black.opacity(0.42)
+                        Color.black.opacity(0.02),
+                        Color.black.opacity(0.24)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
@@ -51,18 +51,19 @@ private struct CamoNASPanelBackground: View {
     private func camoPieces(width: CGFloat, height: CGFloat) -> [CamoPiece] {
         var rng = SeededRandom(seed: seed)
         let colors = [
-            Color(red: 0.052, green: 0.052, blue: 0.052),
-            Color(red: 0.10, green: 0.08, blue: 0.09),
-            Color(red: 0.20, green: 0.12, blue: 0.14),
+            Color(red: 0.03, green: 0.03, blue: 0.03),
+            Color(red: 0.08, green: 0.075, blue: 0.075),
+            Color(red: 0.15, green: 0.12, blue: 0.13),
+            Color(red: 0.27, green: 0.11, blue: 0.14),
             CamoNASTheme.accentSoft,
             CamoNASTheme.accent,
             CamoNASTheme.accentHot.opacity(0.82)
         ]
-        let cell = max(8, min(16, min(width, height) / 12))
-        let count = max(34, min(120, Int((width * height) / 3_700)))
+        let cell = max(10, min(18, min(width, height) / 10))
+        let count = max(44, min(140, Int((width * height) / 2_900)))
         return (0..<count).map { index in
-            let cellsWide = rng.nextInt(in: 1...5)
-            let cellsHigh = rng.nextInt(in: 1...4)
+            let cellsWide = rng.nextInt(in: 1...7)
+            let cellsHigh = rng.nextInt(in: 1...5)
             let xCells = max(1, Int(ceil(width / cell)))
             let yCells = max(1, Int(ceil(height / cell)))
             let x = CGFloat(rng.nextInt(in: -2...xCells)) * cell
@@ -73,11 +74,24 @@ private struct CamoNASPanelBackground: View {
                 width: CGFloat(cellsWide) * cell,
                 height: CGFloat(cellsHigh) * cell
             )
-            let isRed = index % 3 == 0 || rng.nextCGFloat(in: 0...1) > 0.72
+            let isRed = index % 2 == 0 || rng.nextCGFloat(in: 0...1) > 0.58
             let colorIndex = isRed ? rng.nextInt(in: 3...(colors.count - 1)) : rng.nextInt(in: 0...2)
-            let opacity: CGFloat = isRed ? rng.nextCGFloat(in: 0.24...0.58) : rng.nextCGFloat(in: 0.18...0.48)
+            let opacity: CGFloat = isRed ? rng.nextCGFloat(in: 0.34...0.72) : rng.nextCGFloat(in: 0.22...0.52)
             return CamoPiece(id: index, rect: rect, color: colors[colorIndex], opacity: opacity)
         }
+    }
+}
+
+private struct CamoNASCardBackground: View {
+    var body: some View {
+        LinearGradient(
+            colors: [
+                Color(red: 0.075, green: 0.075, blue: 0.075),
+                Color(red: 0.040, green: 0.040, blue: 0.040)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
     }
 }
 
@@ -378,7 +392,9 @@ struct ContentView: View {
             .background(CamoNASTheme.sidebar)
         } detail: {
             ZStack(alignment: .bottomTrailing) {
-                CamoNASTheme.window.ignoresSafeArea()
+                CamoNASPanelBackground(seed: 12_420_002)
+                    .ignoresSafeArea()
+                CamoNASTheme.window.opacity(0.46).ignoresSafeArea()
                 content
                 if let liveVM, let liveURL {
                     liveVMOverlay(vm: liveVM, url: liveURL)
@@ -1292,7 +1308,7 @@ struct ContentView: View {
         }
         .padding(26)
         .frame(width: 560)
-        .background(CamoNASPanelBackground())
+        .background(CamoNASCardBackground())
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
@@ -1844,7 +1860,7 @@ struct ContentView: View {
         }
         .frame(maxWidth: .infinity, minHeight: 190, alignment: .topLeading)
         .padding(16)
-        .background(CamoNASPanelBackground())
+        .background(CamoNASCardBackground())
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
@@ -1977,7 +1993,7 @@ struct ContentView: View {
                 .frame(width: width, height: height)
                 .background(.black)
         }
-        .background(CamoNASPanelBackground())
+        .background(CamoNASCardBackground())
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
@@ -2203,7 +2219,7 @@ struct ContentView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, minHeight: 220, alignment: .topLeading)
-        .background(CamoNASPanelBackground())
+        .background(CamoNASCardBackground())
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
@@ -2237,7 +2253,7 @@ struct ContentView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, minHeight: 180, alignment: .topLeading)
-        .background(CamoNASPanelBackground())
+        .background(CamoNASCardBackground())
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
@@ -2414,7 +2430,7 @@ struct ContentView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, minHeight: 230, alignment: .topLeading)
-        .background(CamoNASPanelBackground())
+        .background(CamoNASCardBackground())
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
