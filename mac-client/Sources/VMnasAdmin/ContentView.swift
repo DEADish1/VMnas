@@ -321,11 +321,6 @@ struct ContentView: View {
                             actionButton("Run System Test", icon: "checkmark.seal", section: .systemTest)
                                 actionButton("Open OS Store", icon: "opticaldiscdrive", section: .osStore)
                                 actionButton("Make Installer USB", icon: "externaldrive.badge.plus", section: .usbMaker)
-                                actionButton("Open Proxmox", icon: "safari") {
-                                    if let url = api.proxmoxURL() {
-                                        NSWorkspace.shared.open(url)
-                                    }
-                                }
                                 actionButton("Refresh Server", icon: "arrow.clockwise") {
                                     Task { await refresh() }
                                 }
@@ -1205,12 +1200,14 @@ struct ContentView: View {
                     }
                 }
             }
-            Section("Admin Access") {
-                Button("Open Proxmox Web UI") {
+            Section("Advanced Fallback") {
+                Button("Open Proxmox Recovery UI") {
                     if let url = api.proxmoxURL() {
                         NSWorkspace.shared.open(url)
                     }
                 }
+                Text("VMnas is the normal control interface. Use this only for low-level recovery or advanced troubleshooting.")
+                    .foregroundStyle(.secondary)
                 Toggle("Prefer noVNC browser console", isOn: .constant(true))
                 Toggle("Use RDP for Windows VMs", isOn: .constant(true))
             }

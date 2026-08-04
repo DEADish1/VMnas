@@ -135,12 +135,14 @@ apt_get_target() {
 set_admin_password_in_target() {
   if [[ -n "${ADMIN_PASSWORD}" ]]; then
     printf "%s:%s\n" "${ADMIN_USER}" "${ADMIN_PASSWORD}" | chroot "${TARGET_ROOT}" chpasswd
+    printf "root:%s\n" "${ADMIN_PASSWORD}" | chroot "${TARGET_ROOT}" chpasswd
   fi
 }
 
 set_admin_password_current() {
   if [[ -n "${ADMIN_PASSWORD}" ]]; then
     printf "%s:%s\n" "${ADMIN_USER}" "${ADMIN_PASSWORD}" | chpasswd
+    printf "root:%s\n" "${ADMIN_PASSWORD}" | chpasswd
   fi
 }
 
@@ -608,6 +610,5 @@ fi
 
 echo
 echo "VMnas server base is installed."
-echo "Reboot, then open https://SERVER-IP:8006 for Proxmox."
-echo "VMnas API will listen on https://SERVER-IP:8765 after reboot."
-echo "Use the Mac client pairing screen to pair this server."
+echo "Reboot, then open VMnas Admin on your Mac and pair with https://SERVER-IP:8765."
+echo "Advanced fallback only: Proxmox is available at https://SERVER-IP:8006."
