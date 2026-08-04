@@ -1097,7 +1097,9 @@ struct ContentView: View {
     private var settings: some View {
         Form {
             Section("Server") {
-                TextField("VMnas Agent URL", text: $api.serverBaseURL)
+                TextField("VMnas server address", text: $api.serverBaseURL)
+                Text("Use the server's LAN IP from the VMnas screen, like 192.168.1.50. The app will add the secure VMnas port automatically.")
+                    .foregroundStyle(.secondary)
                 LabeledContent("Server", value: api.isServerReachable ? "Reachable" : "Not reachable")
                 LabeledContent("Admin", value: api.isConnected ? "Paired and connected" : "Not paired")
                 Button("Refresh Connection") {

@@ -50,11 +50,15 @@ final class VMnasAPI: ObservableObject {
     }()
     private let session: URLSession = {
         let delegate = VMnasURLSessionDelegate()
-        return URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForRequest = 8
+        configuration.timeoutIntervalForResource = 12
+        return URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
     }()
 
     func refresh() async {
         loadTokenIfNeeded()
+        normalizeServerAddress()
         do {
             let pairing: PairingStatus = try await get("/pairing/status")
             self.pairingStatus = pairing
@@ -119,10 +123,17 @@ final class VMnasAPI: ObservableObject {
     }
 
     func proxmoxURL() -> URL? {
-        guard let base = URL(string: serverBaseURL), let host = base.host else {
+        guard let base = normalizedBaseURL(), let host = base.host else {
             return nil
         }
         return URL(string: "https://\(host):8006")
+    }
+
+    func normalizeServerAddress() {
+        guard let normalized = normalizedBaseURL()?.absoluteString else {
+            return
+        }
+        serverBaseURL = normalized.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
     }
 
     func refreshCompatibility() async {
@@ -434,7 +445,7 @@ final class VMnasAPI: ObservableObject {
     }
 
     private func get<T: Decodable>(_ path: String) async throws -> T {
-        guard let url = URL(string: path, relativeTo: URL(string: serverBaseURL)) else {
+        guard let url = URL(string: path, relativeTo: normalizedBaseURL()) else {
             throw URLError(.badURL)
         }
         var request = URLRequest(url: url)
@@ -447,7 +458,7 @@ final class VMnasAPI: ObservableObject {
     }
 
     private func post(_ path: String) async throws {
-        guard let url = URL(string: path, relativeTo: URL(string: serverBaseURL)) else {
+        guard let url = URL(string: path, relativeTo: normalizedBaseURL()) else {
             throw URLError(.badURL)
         }
         var request = URLRequest(url: url)
@@ -460,7 +471,7 @@ final class VMnasAPI: ObservableObject {
     }
 
     private func postEmpty<T: Decodable>(_ path: String) async throws -> T {
-        guard let url = URL(string: path, relativeTo: URL(string: serverBaseURL)) else {
+        guard let url = URL(string: path, relativeTo: normalizedBaseURL()) else {
             throw URLError(.badURL)
         }
         var request = URLRequest(url: url)
@@ -474,7 +485,7 @@ final class VMnasAPI: ObservableObject {
     }
 
     private func delete(_ path: String) async throws {
-        guard let url = URL(string: path, relativeTo: URL(string: serverBaseURL)) else {
+        guard let url = URL(string: path, relativeTo: normalizedBaseURL()) else {
             throw URLError(.badURL)
         }
         var request = URLRequest(url: url)
@@ -487,7 +498,7 @@ final class VMnasAPI: ObservableObject {
     }
 
     private func postJSON<T: Decodable>(_ path: String, body: [String: String]) async throws -> T {
-        guard let url = URL(string: path, relativeTo: URL(string: serverBaseURL)) else {
+        guard let url = URL(string: path, relativeTo: normalizedBaseURL()) else {
             throw URLError(.badURL)
         }
         var request = URLRequest(url: url)
@@ -503,7 +514,7 @@ final class VMnasAPI: ObservableObject {
     }
 
     private func postJSON<T: Decodable, Body: Encodable>(_ path: String, body: Body) async throws -> T {
-        guard let url = URL(string: path, relativeTo: URL(string: serverBaseURL)) else {
+        guard let url = URL(string: path, relativeTo: normalizedBaseURL()) else {
             throw URLError(.badURL)
         }
         var request = URLRequest(url: url)
@@ -519,7 +530,7 @@ final class VMnasAPI: ObservableObject {
     }
 
     private func uploadFile<T: Decodable>(_ path: String, fileURL: URL, fieldName: String) async throws -> T {
-        guard let url = URL(string: path, relativeTo: URL(string: serverBaseURL)) else {
+        guard let url = URL(string: path, relativeTo: normalizedBaseURL()) else {
             throw URLError(.badURL)
         }
         let boundary = "VMnasBoundary-\(UUID().uuidString)"
@@ -567,6 +578,24 @@ final class VMnasAPI: ObservableObject {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             request.setValue(token, forHTTPHeaderField: "X-VMnas-Token")
         }
+    }
+
+    private func normalizedBaseURL() -> URL? {
+        var value = serverBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return nil }
+        if !value.contains("://") {
+            value = "https://\(value)"
+        }
+        guard var components = URLComponents(string: value) else {
+            return nil
+        }
+        if components.port == nil {
+            components.port = 8765
+        }
+        components.path = ""
+        components.query = nil
+        components.fragment = nil
+        return components.url
     }
 }
 
