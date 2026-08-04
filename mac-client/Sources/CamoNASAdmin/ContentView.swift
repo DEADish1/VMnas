@@ -25,7 +25,7 @@ private struct CamoNASPanelBackground: View {
 
     var body: some View {
         ZStack {
-            Color(red: 0.045, green: 0.045, blue: 0.045)
+            Color(red: 0.055, green: 0.055, blue: 0.055)
             GeometryReader { proxy in
                 let width = proxy.size.width
                 let height = proxy.size.height
@@ -38,8 +38,8 @@ private struct CamoNASPanelBackground: View {
                 }
                 LinearGradient(
                     colors: [
-                        Color.black.opacity(0.02),
-                        Color.black.opacity(0.24)
+                        Color.black.opacity(0.00),
+                        Color.black.opacity(0.08)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
@@ -51,19 +51,20 @@ private struct CamoNASPanelBackground: View {
     private func camoPieces(width: CGFloat, height: CGFloat) -> [CamoPiece] {
         var rng = SeededRandom(seed: seed)
         let colors = [
-            Color(red: 0.03, green: 0.03, blue: 0.03),
-            Color(red: 0.08, green: 0.075, blue: 0.075),
-            Color(red: 0.15, green: 0.12, blue: 0.13),
-            Color(red: 0.27, green: 0.11, blue: 0.14),
-            CamoNASTheme.accentSoft,
+            Color(red: 0.020, green: 0.020, blue: 0.020),
+            Color(red: 0.090, green: 0.090, blue: 0.090),
+            Color(red: 0.160, green: 0.155, blue: 0.155),
+            Color(red: 0.245, green: 0.225, blue: 0.225),
+            Color(red: 0.38, green: 0.075, blue: 0.095),
+            Color(red: 0.58, green: 0.08, blue: 0.105),
             CamoNASTheme.accent,
-            CamoNASTheme.accentHot.opacity(0.82)
+            CamoNASTheme.accentHot
         ]
-        let cell = max(10, min(18, min(width, height) / 10))
-        let count = max(44, min(140, Int((width * height) / 2_900)))
+        let cell = max(6, min(10, min(width, height) / 28))
+        let count = max(260, min(1_100, Int((width * height) / 520)))
         return (0..<count).map { index in
-            let cellsWide = rng.nextInt(in: 1...7)
-            let cellsHigh = rng.nextInt(in: 1...5)
+            let cellsWide = rng.nextInt(in: 1...5)
+            let cellsHigh = rng.nextInt(in: 1...3)
             let xCells = max(1, Int(ceil(width / cell)))
             let yCells = max(1, Int(ceil(height / cell)))
             let x = CGFloat(rng.nextInt(in: -2...xCells)) * cell
@@ -74,9 +75,9 @@ private struct CamoNASPanelBackground: View {
                 width: CGFloat(cellsWide) * cell,
                 height: CGFloat(cellsHigh) * cell
             )
-            let isRed = index % 2 == 0 || rng.nextCGFloat(in: 0...1) > 0.58
-            let colorIndex = isRed ? rng.nextInt(in: 3...(colors.count - 1)) : rng.nextInt(in: 0...2)
-            let opacity: CGFloat = isRed ? rng.nextCGFloat(in: 0.34...0.72) : rng.nextCGFloat(in: 0.22...0.52)
+            let isRed = index % 4 == 0 || rng.nextCGFloat(in: 0...1) > 0.70
+            let colorIndex = isRed ? rng.nextInt(in: 4...(colors.count - 1)) : rng.nextInt(in: 0...3)
+            let opacity: CGFloat = isRed ? rng.nextCGFloat(in: 0.72...0.96) : rng.nextCGFloat(in: 0.58...0.86)
             return CamoPiece(id: index, rect: rect, color: colors[colorIndex], opacity: opacity)
         }
     }
@@ -394,7 +395,7 @@ struct ContentView: View {
             ZStack(alignment: .bottomTrailing) {
                 CamoNASPanelBackground(seed: 12_420_002)
                     .ignoresSafeArea()
-                CamoNASTheme.window.opacity(0.46).ignoresSafeArea()
+                CamoNASTheme.window.opacity(0.12).ignoresSafeArea()
                 content
                 if let liveVM, let liveURL {
                     liveVMOverlay(vm: liveVM, url: liveURL)
@@ -1903,7 +1904,7 @@ struct ContentView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(CamoNASPanelBackground())
+        .background(CamoNASCardBackground())
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
