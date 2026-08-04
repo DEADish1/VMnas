@@ -31,15 +31,19 @@ private struct CamoNASPanelBackground: View {
                 let height = proxy.size.height
                 let pieces = camoPieces(width: width, height: height)
                 ForEach(pieces) { piece in
-                    Path { path in
-                        path.move(to: piece.points[0])
-                        for point in piece.points.dropFirst() {
-                            path.addLine(to: point)
-                        }
-                        path.closeSubpath()
-                    }
-                    .fill(piece.color.opacity(piece.opacity))
+                    Rectangle()
+                        .fill(piece.color.opacity(piece.opacity))
+                        .frame(width: piece.rect.width, height: piece.rect.height)
+                        .position(x: piece.rect.midX, y: piece.rect.midY)
                 }
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(0.04),
+                        Color.black.opacity(0.42)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
             }
         }
     }
@@ -47,51 +51,39 @@ private struct CamoNASPanelBackground: View {
     private func camoPieces(width: CGFloat, height: CGFloat) -> [CamoPiece] {
         var rng = SeededRandom(seed: seed)
         let colors = [
+            Color(red: 0.052, green: 0.052, blue: 0.052),
+            Color(red: 0.10, green: 0.08, blue: 0.09),
+            Color(red: 0.20, green: 0.12, blue: 0.14),
             CamoNASTheme.accentSoft,
             CamoNASTheme.accent,
-            CamoNASTheme.border,
-            CamoNASTheme.panelRaised,
-            Color(red: 0.055, green: 0.055, blue: 0.055)
+            CamoNASTheme.accentHot.opacity(0.82)
         ]
-        let count = max(12, min(30, Int((width * height) / 11_000)))
+        let cell = max(8, min(16, min(width, height) / 12))
+        let count = max(34, min(120, Int((width * height) / 3_700)))
         return (0..<count).map { index in
-            let centerX = rng.nextCGFloat(in: -0.08...1.08) * width
-            let centerY = rng.nextCGFloat(in: -0.10...1.10) * height
-            let pieceWidth = rng.nextCGFloat(in: 0.11...0.24) * width
-            let pieceHeight = rng.nextCGFloat(in: 0.12...0.28) * height
-            let notch = rng.nextCGFloat(in: 0.18...0.42)
-            let points: [CGPoint]
-            if rng.nextBool() {
-                points = [
-                    CGPoint(x: centerX - pieceWidth * 0.50, y: centerY - pieceHeight * 0.22),
-                    CGPoint(x: centerX + pieceWidth * 0.12, y: centerY - pieceHeight * 0.50),
-                    CGPoint(x: centerX + pieceWidth * 0.50, y: centerY - pieceHeight * 0.10),
-                    CGPoint(x: centerX + pieceWidth * notch, y: centerY + pieceHeight * 0.12),
-                    CGPoint(x: centerX + pieceWidth * 0.28, y: centerY + pieceHeight * 0.50),
-                    CGPoint(x: centerX - pieceWidth * 0.34, y: centerY + pieceHeight * 0.32)
-                ]
-            } else {
-                points = [
-                    CGPoint(x: centerX - pieceWidth * 0.42, y: centerY - pieceHeight * 0.50),
-                    CGPoint(x: centerX + pieceWidth * 0.38, y: centerY - pieceHeight * 0.32),
-                    CGPoint(x: centerX + pieceWidth * 0.50, y: centerY + pieceHeight * 0.22),
-                    CGPoint(x: centerX - pieceWidth * 0.04, y: centerY + pieceHeight * 0.50),
-                    CGPoint(x: centerX - pieceWidth * 0.50, y: centerY + pieceHeight * 0.08)
-                ]
-            }
-            return CamoPiece(
-                id: index,
-                points: points,
-                color: colors[index % colors.count],
-                opacity: rng.nextCGFloat(in: 0.10...0.32)
+            let cellsWide = rng.nextInt(in: 1...5)
+            let cellsHigh = rng.nextInt(in: 1...4)
+            let xCells = max(1, Int(ceil(width / cell)))
+            let yCells = max(1, Int(ceil(height / cell)))
+            let x = CGFloat(rng.nextInt(in: -2...xCells)) * cell
+            let y = CGFloat(rng.nextInt(in: -2...yCells)) * cell
+            let rect = CGRect(
+                x: x,
+                y: y,
+                width: CGFloat(cellsWide) * cell,
+                height: CGFloat(cellsHigh) * cell
             )
+            let isRed = index % 3 == 0 || rng.nextCGFloat(in: 0...1) > 0.72
+            let colorIndex = isRed ? rng.nextInt(in: 3...(colors.count - 1)) : rng.nextInt(in: 0...2)
+            let opacity: CGFloat = isRed ? rng.nextCGFloat(in: 0.24...0.58) : rng.nextCGFloat(in: 0.18...0.48)
+            return CamoPiece(id: index, rect: rect, color: colors[colorIndex], opacity: opacity)
         }
     }
 }
 
 private struct CamoPiece: Identifiable {
     let id: Int
-    let points: [CGPoint]
+    let rect: CGRect
     let color: Color
     let opacity: CGFloat
 }
@@ -111,6 +103,12 @@ private struct SeededRandom {
 
     mutating func nextBool() -> Bool {
         nextCGFloat(in: 0...1) > 0.5
+    }
+
+    mutating func nextInt(in range: ClosedRange<Int>) -> Int {
+        let value = nextCGFloat(in: 0...1)
+        let span = range.upperBound - range.lowerBound + 1
+        return range.lowerBound + min(span - 1, Int(value * CGFloat(span)))
     }
 }
 
