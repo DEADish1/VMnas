@@ -3,6 +3,83 @@ import SwiftUI
 import UniformTypeIdentifiers
 import CoreImage.CIFilterBuiltins
 
+private enum VMnasTheme {
+    static let window = Color(red: 0.035, green: 0.039, blue: 0.039)
+    static let sidebar = Color(red: 0.055, green: 0.047, blue: 0.051)
+    static let panel = Color(red: 0.095, green: 0.079, blue: 0.088)
+    static let panelRaised = Color(red: 0.13, green: 0.095, blue: 0.108)
+    static let field = Color(red: 0.067, green: 0.067, blue: 0.067)
+    static let accent = Color(red: 0.84, green: 0.11, blue: 0.16)
+    static let accentHot = Color(red: 1.0, green: 0.25, blue: 0.25)
+    static let accentSoft = Color(red: 0.45, green: 0.12, blue: 0.16)
+    static let border = Color(red: 0.46, green: 0.36, blue: 0.40)
+    static let textMuted = Color(red: 0.84, green: 0.82, blue: 0.83)
+}
+
+private struct VMnasPanelBackground: View {
+    var body: some View {
+        ZStack {
+            VMnasTheme.panel
+            GeometryReader { proxy in
+                let width = proxy.size.width
+                let height = proxy.size.height
+                Group {
+                    Path { path in
+                        path.move(to: CGPoint(x: 0, y: height * 0.15))
+                        path.addLine(to: CGPoint(x: width * 0.16, y: 0))
+                        path.addLine(to: CGPoint(x: width * 0.36, y: 0))
+                        path.addLine(to: CGPoint(x: width * 0.24, y: height * 0.31))
+                        path.addLine(to: CGPoint(x: width * 0.38, y: height * 0.43))
+                        path.addLine(to: CGPoint(x: width * 0.18, y: height * 0.67))
+                        path.addLine(to: CGPoint(x: 0, y: height * 0.45))
+                        path.closeSubpath()
+                    }
+                    .fill(VMnasTheme.accentSoft.opacity(0.34))
+
+                    Path { path in
+                        path.move(to: CGPoint(x: width * 0.55, y: 0))
+                        path.addLine(to: CGPoint(x: width * 0.86, y: 0))
+                        path.addLine(to: CGPoint(x: width * 0.74, y: height * 0.25))
+                        path.addLine(to: CGPoint(x: width, y: height * 0.45))
+                        path.addLine(to: CGPoint(x: width * 0.76, y: height * 0.72))
+                        path.addLine(to: CGPoint(x: width * 0.55, y: height * 0.38))
+                        path.closeSubpath()
+                    }
+                    .fill(VMnasTheme.accent.opacity(0.16))
+
+                    Path { path in
+                        path.move(to: CGPoint(x: width * 0.82, y: height))
+                        path.addLine(to: CGPoint(x: width, y: height * 0.76))
+                        path.addLine(to: CGPoint(x: width, y: height))
+                        path.closeSubpath()
+                    }
+                    .fill(VMnasTheme.border.opacity(0.20))
+                }
+            }
+        }
+    }
+}
+
+private struct VMnasButtonStyle: ButtonStyle {
+    var prominent = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.callout.weight(.semibold))
+            .foregroundStyle(Color.white)
+            .padding(.horizontal, prominent ? 14 : 12)
+            .padding(.vertical, prominent ? 8 : 7)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(configuration.isPressed ? VMnasTheme.accentSoft : (prominent ? VMnasTheme.accent : VMnasTheme.panelRaised))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(configuration.isPressed ? VMnasTheme.accentHot : VMnasTheme.accent, lineWidth: 1)
+            )
+    }
+}
+
 enum AppSection: String, CaseIterable, Identifiable {
     case overview = "Overview"
     case virtualMachines = "Virtual Computers"
@@ -217,14 +294,28 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(availableSections, selection: $selection) { section in
-                Label(section.rawValue, systemImage: section.icon)
-                    .tag(section)
+            VStack(alignment: .leading, spacing: 14) {
+                Text("VMnas Admin")
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 18)
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(availableSections) { section in
+                            sidebarButton(section)
+                        }
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.bottom, 16)
+                }
             }
-            .navigationTitle("VMnas")
             .frame(minWidth: 220)
+            .background(VMnasTheme.sidebar)
         } detail: {
             ZStack(alignment: .bottomTrailing) {
+                VMnasTheme.window.ignoresSafeArea()
                 content
                 if let liveVM, let liveURL {
                     liveVMOverlay(vm: liveVM, url: liveURL)
@@ -232,6 +323,8 @@ struct ContentView: View {
                 }
             }
         }
+        .tint(VMnasTheme.accent)
+        .preferredColorScheme(.dark)
         .task {
             await refresh()
         }
@@ -245,6 +338,29 @@ struct ContentView: View {
         )) {
             firstRunSetup
         }
+    }
+
+    private func sidebarButton(_ section: AppSection) -> some View {
+        let isSelected = selection == section
+        return Button {
+            selection = section
+        } label: {
+            Label(section.rawValue, systemImage: section.icon)
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(isSelected ? Color.white : VMnasTheme.textMuted)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 7)
+                        .fill(isSelected ? VMnasTheme.accent : Color.clear)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 7)
+                        .stroke(isSelected ? VMnasTheme.accentHot.opacity(0.65) : Color.clear, lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
@@ -384,7 +500,7 @@ struct ContentView: View {
                     Button("Attach Test Media") {
                         Task { await attachWindowsTuningTestMedia() }
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(VMnasButtonStyle(prominent: true))
                     .disabled(selectedWindowsTuningVMID == 0)
                     Button("Refresh VMs") {
                         Task { await refresh() }
@@ -402,8 +518,12 @@ struct ContentView: View {
                                 .font(.system(.caption, design: .monospaced))
                                 .textSelection(.enabled)
                                 .padding(10)
-                                .background(.quaternary)
+                                .background(VMnasTheme.field)
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(VMnasTheme.border.opacity(0.45), lineWidth: 1)
+                                )
                         }
                     }
                 }
@@ -513,7 +633,7 @@ struct ContentView: View {
                     Button("Create") {
                         Task { await createSelectedVM() }
                     }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(VMnasButtonStyle(prominent: true))
                         .disabled(!canCreateVM)
                 }
             }
@@ -564,7 +684,7 @@ struct ContentView: View {
                         Button(isRunningBenchmark ? "Benchmarking" : "Run Benchmark") {
                             Task { await runServerBenchmark() }
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(VMnasButtonStyle(prominent: true))
                         .disabled(isRunningBenchmark)
                     }
                     Text(api.compatibility?.liveModeHint ?? "Refreshes system-fit results while you test hardware, drives, and modules.")
@@ -745,7 +865,7 @@ struct ContentView: View {
                     Button("Open Settings") {
                         selection = .settings
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(VMnasButtonStyle(prominent: true))
                 }
             }
         }
@@ -763,7 +883,7 @@ struct ContentView: View {
                     Button("Make Installer USB") {
                         selection = .usbMaker
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(VMnasButtonStyle(prominent: true))
                     Button("Open Settings") {
                         selection = .settings
                     }
@@ -992,7 +1112,7 @@ struct ContentView: View {
                         Button("Make Installer USB") {
                             prepareUSBConfirmation()
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(VMnasButtonStyle(prominent: true))
                         .disabled(!canMakeInstallerUSB)
                         Button("Run in Terminal") {
                             Task { await openTerminalUSBWriter() }
@@ -1059,7 +1179,7 @@ struct ContentView: View {
             HStack(spacing: 12) {
                 Image(systemName: "externaldrive.badge.plus")
                     .font(.system(size: 34))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(VMnasTheme.accentHot)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Set Up VMnas Admin")
                         .font(.title2.weight(.semibold))
@@ -1095,18 +1215,22 @@ struct ContentView: View {
                 Button("Reveal VMnas Admin") {
                     revealVMnasAdminInFinder()
                 }
+                .buttonStyle(VMnasButtonStyle())
                 Button("Open Full Disk Access") {
                     openFullDiskAccessSettings()
                 }
+                .buttonStyle(VMnasButtonStyle())
                 Spacer()
                 Button("Continue") {
                     hasCompletedFirstRunSetup = true
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(VMnasButtonStyle(prominent: true))
             }
         }
         .padding(26)
         .frame(width: 560)
+        .background(VMnasPanelBackground())
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     private func permissionRow(title: String, detail: String, icon: String, actionTitle: String, action: @escaping () -> Void) -> some View {
@@ -1121,11 +1245,16 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 Button(actionTitle, action: action)
+                    .buttonStyle(VMnasButtonStyle())
             }
             Spacer()
         }
         .padding(14)
-        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
+        .background(VMnasTheme.panelRaised, in: RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(VMnasTheme.border.opacity(0.45), lineWidth: 1)
+        )
     }
 
     private var settings: some View {
@@ -1139,7 +1268,7 @@ struct ContentView: View {
                     Button(api.isDiscoveringServer ? "Looking..." : "Find Server") {
                         Task { await api.findServer() }
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(VMnasButtonStyle(prominent: true))
                     .disabled(api.isDiscoveringServer)
                     Button("Refresh") {
                         Task { await refresh() }
@@ -1191,10 +1320,11 @@ struct ContentView: View {
                     Button("Check Status") {
                         Task { await api.refreshUpdateStatus() }
                     }
+                    .buttonStyle(VMnasButtonStyle())
                     Button(isStartingServerUpdate || api.updateStatus?.running == true ? "Updating" : "Run Server Update") {
                         Task { await runServerUpdateFromClient() }
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(VMnasButtonStyle(prominent: true))
                     .disabled(!api.isConnected || isStartingServerUpdate || api.updateStatus?.running == true)
                 }
             }
@@ -1212,7 +1342,7 @@ struct ContentView: View {
                         pairingPin = ""
                     }
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(VMnasButtonStyle(prominent: true))
                 .disabled(pairingPin.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || api.deviceToken != nil || api.isDiscoveringServer)
                 if api.deviceToken != nil {
                     Label("This Mac is paired. Secure access is saved in Keychain.", systemImage: "key.fill")
@@ -1222,9 +1352,11 @@ struct ContentView: View {
                     Button("New Pairing PIN") {
                         Task { await api.rotatePairingPin() }
                     }
+                    .buttonStyle(VMnasButtonStyle())
                     Button("Show QR") {
                         showPairingQR.toggle()
                     }
+                    .buttonStyle(VMnasButtonStyle())
                 }
                 if let pin = api.latestPairingPin {
                     LabeledContent("New PIN", value: pin)
@@ -1248,6 +1380,7 @@ struct ContentView: View {
                             Button("Revoke") {
                                 Task { await api.revokeDevice(id: device.id) }
                             }
+                            .buttonStyle(VMnasButtonStyle())
                         }
                     }
                 }
@@ -1258,6 +1391,7 @@ struct ContentView: View {
                         NSWorkspace.shared.open(url)
                     }
                 }
+                .buttonStyle(VMnasButtonStyle())
                 Text("VMnas is the normal control interface. Use this only for low-level recovery or advanced troubleshooting.")
                     .foregroundStyle(.secondary)
                 Toggle("Prefer noVNC browser console", isOn: .constant(true))
@@ -1277,12 +1411,16 @@ struct ContentView: View {
                 Button("Enable Remote Access") {
                     Task { await api.setRemoteAccess(enabled: true) }
                 }
+                .buttonStyle(VMnasButtonStyle(prominent: true))
                 Button("Disable Remote Access") {
                     Task { await api.setRemoteAccess(enabled: false) }
                 }
+                .buttonStyle(VMnasButtonStyle())
             }
         }
         .padding(24)
+        .scrollContentBackground(.hidden)
+        .background(VMnasTheme.window)
         .navigationTitle("Settings")
     }
 
@@ -1581,8 +1719,14 @@ struct ContentView: View {
 
     private func topBar(title: String) -> some View {
         HStack {
-            Text(title)
-                .font(.largeTitle.weight(.semibold))
+            VStack(alignment: .leading, spacing: 4) {
+                Text("VMNAS  /  ADMIN STATION")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(VMnasTheme.textMuted)
+                Text(title)
+                    .font(.largeTitle.weight(.semibold))
+                    .foregroundStyle(.white)
+            }
             Spacer()
             TextField("Server", text: $api.serverBaseURL)
                 .textFieldStyle(.roundedBorder)
@@ -1593,6 +1737,7 @@ struct ContentView: View {
                 Image(systemName: "arrow.clockwise")
             }
             .help("Refresh")
+            .buttonStyle(VMnasButtonStyle())
         }
     }
 
@@ -1607,8 +1752,12 @@ struct ContentView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(.thinMaterial)
+        .background(VMnasTheme.panelRaised)
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(VMnasTheme.border.opacity(0.55), lineWidth: 1)
+        )
     }
 
     private func controlCard(title: String, detail: String, icon: String, primary: String, section: AppSection) -> some View {
@@ -1628,14 +1777,15 @@ struct ContentView: View {
             Button(primary) {
                 selection = section
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(VMnasButtonStyle(prominent: true))
         }
         .frame(maxWidth: .infinity, minHeight: 190, alignment: .topLeading)
         .padding(16)
-        .background(.background)
+        .background(VMnasPanelBackground())
+        .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(.separator, lineWidth: 1)
+                .stroke(VMnasTheme.border.opacity(0.65), lineWidth: 1)
         )
     }
 
@@ -1674,10 +1824,11 @@ struct ContentView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(.background)
+        .background(VMnasPanelBackground())
+        .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(.separator, lineWidth: 1)
+                .stroke(VMnasTheme.border.opacity(0.65), lineWidth: 1)
         )
     }
 
@@ -1688,8 +1839,12 @@ struct ContentView: View {
             Spacer()
         }
         .padding(12)
-        .background(Color.orange.opacity(0.14))
+        .background(VMnasTheme.accentSoft.opacity(0.30))
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(VMnasTheme.accent.opacity(0.75), lineWidth: 1)
+        )
     }
 
     private func liveVMOverlay(vm: VmSummary, url: URL) -> some View {
@@ -1759,11 +1914,11 @@ struct ContentView: View {
                 .frame(width: width, height: height)
                 .background(.black)
         }
-        .background(.regularMaterial)
+        .background(VMnasPanelBackground())
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(.separator, lineWidth: 1)
+                .stroke(VMnasTheme.accent.opacity(0.70), lineWidth: 1)
         )
         .shadow(radius: 18)
     }
@@ -1966,7 +2121,7 @@ struct ContentView: View {
                         .font(.caption2)
                         .padding(.horizontal, 7)
                         .padding(.vertical, 3)
-                        .background(.quaternary)
+                        .background(VMnasTheme.accentSoft.opacity(0.32))
                         .clipShape(Capsule())
                 }
             }
@@ -1979,15 +2134,17 @@ struct ContentView: View {
                 Button(buttonTitle(for: module)) {
                     startDownload(module)
                 }
+                .buttonStyle(VMnasButtonStyle())
                 .disabled(module.installState == .downloading || module.installState == .installed)
             }
         }
         .padding(16)
         .frame(maxWidth: .infinity, minHeight: 220, alignment: .topLeading)
-        .background(.background)
+        .background(VMnasPanelBackground())
+        .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(.separator, lineWidth: 1)
+                .stroke(VMnasTheme.border.opacity(0.65), lineWidth: 1)
         )
     }
 
@@ -2017,10 +2174,11 @@ struct ContentView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, minHeight: 180, alignment: .topLeading)
-        .background(.background)
+        .background(VMnasPanelBackground())
+        .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(.separator, lineWidth: 1)
+                .stroke(VMnasTheme.border.opacity(0.65), lineWidth: 1)
         )
     }
 
@@ -2053,8 +2211,12 @@ struct ContentView: View {
                     }
                 }
                 .padding(12)
-                .background(.thinMaterial)
+                .background(VMnasTheme.panelRaised)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(VMnasTheme.border.opacity(0.45), lineWidth: 1)
+                )
             }
         }
     }
@@ -2085,7 +2247,7 @@ struct ContentView: View {
                             .font(.caption)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
-                            .background(.quaternary)
+                            .background(VMnasTheme.accentSoft.opacity(0.32))
                             .clipShape(Capsule())
                         Text(source.ready ? "Can import" : "Not ready")
                             .font(.caption)
@@ -2093,8 +2255,12 @@ struct ContentView: View {
                     }
                 }
                 .padding(12)
-                .background(.thinMaterial)
+                .background(VMnasTheme.panelRaised)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(VMnasTheme.border.opacity(0.45), lineWidth: 1)
+                )
             }
         }
     }
@@ -2102,7 +2268,7 @@ struct ContentView: View {
     private func recommendationRow(_ recommendation: BenchmarkRecommendation) -> some View {
         HStack(alignment: .top) {
             Image(systemName: "gauge.with.dots.needle.50percent")
-                .foregroundStyle(.blue)
+                .foregroundStyle(VMnasTheme.accentHot)
             VStack(alignment: .leading, spacing: 4) {
                 Text(recommendation.name)
                     .font(.headline)
@@ -2117,8 +2283,12 @@ struct ContentView: View {
             Spacer()
         }
         .padding(12)
-        .background(.thinMaterial)
+        .background(VMnasTheme.panelRaised)
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(VMnasTheme.border.opacity(0.45), lineWidth: 1)
+        )
     }
 
     private func osCard(_ item: OsStoreItem) -> some View {
@@ -2133,7 +2303,7 @@ struct ContentView: View {
                 }
                 Spacer()
                 Image(systemName: item.downloadSupported ? "arrow.down.circle" : "safari")
-                    .foregroundStyle(item.downloadSupported ? .blue : .secondary)
+                    .foregroundStyle(item.downloadSupported ? VMnasTheme.accentHot : .secondary)
             }
 
             Text(item.summary)
@@ -2151,7 +2321,7 @@ struct ContentView: View {
                         .font(.caption2)
                         .padding(.horizontal, 7)
                         .padding(.vertical, 3)
-                        .background(.quaternary)
+                        .background(VMnasTheme.accentSoft.opacity(0.32))
                         .clipShape(Capsule())
                 }
             }
@@ -2169,21 +2339,23 @@ struct ContentView: View {
                     Button("Create VM") {
                         createVMFromDownloadedOS(item)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(VMnasButtonStyle(prominent: true))
                 } else {
                     Button(osButtonTitle(for: item)) {
                         startOSDownload(item)
                     }
+                    .buttonStyle(VMnasButtonStyle())
                     .disabled(item.installState == .downloading || item.installState == .installed)
                 }
             }
         }
         .padding(16)
         .frame(maxWidth: .infinity, minHeight: 230, alignment: .topLeading)
-        .background(.background)
+        .background(VMnasPanelBackground())
+        .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(.separator, lineWidth: 1)
+                .stroke(VMnasTheme.border.opacity(0.65), lineWidth: 1)
         )
     }
 
@@ -2212,12 +2384,17 @@ struct ContentView: View {
                         Button(osButtonTitle(for: item)) {
                             startOSDownload(item)
                         }
+                        .buttonStyle(VMnasButtonStyle())
                         .disabled(item.installState == .downloading || item.installState == .installed)
                     }
                 }
                 .padding(12)
-                .background(.thinMaterial)
+                .background(VMnasTheme.panelRaised)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(VMnasTheme.border.opacity(0.45), lineWidth: 1)
+                )
             }
         }
     }
