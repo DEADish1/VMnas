@@ -37,12 +37,12 @@ final class VMnasAPI: ObservableObject {
             return "Connect to a VMnas server first."
         }
         if deviceToken == nil {
-            return "Pair this Mac with the server to unlock server module installs."
+            return "Pair this Mac with the server to unlock server Apps."
         }
         if !isConnected {
-            return "Refresh the paired server connection to load server modules."
+            return "Refresh the paired server connection to load server Apps."
         }
-        return "Ready. Modules will install on the connected VMnas server."
+        return "Ready. Apps will install on the connected VMnas server."
     }
 
     private let decoder: JSONDecoder = {
@@ -71,35 +71,37 @@ final class VMnasAPI: ObservableObject {
                 return
             }
 
-            async let resources: HostResources = get("/host/resources")
-            async let compatibility: HostCompatibility = get("/host/compatibility")
-            async let disks: [HostDisk] = get("/host/disks")
-            async let ingestSources: [StorageIngestSource] = get("/storage/ingest-sources")
-            async let benchmark: SystemBenchmark = get("/host/benchmark/latest")
-            async let preset: VmPreset = get("/presets/nas")
-            async let presets: [VmPreset] = get("/presets/vms")
-            async let isos: [IsoImage] = get("/isos")
-            async let osStore: [OsStoreItem] = get("/os-store/systems")
-            async let osDownloads: [OsStoreItem] = get("/os-store/downloads")
-            async let remote: RemoteAccessStatus = get("/remote/status")
-            async let updateStatus: ServerUpdateStatus = get("/system/update/status")
-            async let gpus: [GpuDevice] = get("/host/gpus")
-            async let devices: [PairedDevice] = get("/pairing/devices")
-            self.resources = try await resources
-            self.compatibility = try await compatibility
-            self.disks = try await disks
-            self.ingestSources = try await ingestSources
-            self.benchmark = try await benchmark
-            self.nasPreset = try await preset
-            self.vmPresets = try await presets
-            self.isos = try await isos
-            self.osStore = try await osStore
-            self.osDownloads = try await osDownloads
-            self.remoteStatus = try await remote
-            self.updateStatus = try await updateStatus
-            self.gpus = try await gpus
-            self.pairedDevices = try await devices
+            let resources: HostResources = try await get("/host/resources")
+            self.resources = resources
             self.isConnected = true
+            self.errorMessage = nil
+
+            async let compatibility: HostCompatibility? = getOptional("/host/compatibility")
+            async let disks: [HostDisk]? = getOptional("/host/disks")
+            async let ingestSources: [StorageIngestSource]? = getOptional("/storage/ingest-sources")
+            async let benchmark: SystemBenchmark? = getOptional("/host/benchmark/latest")
+            async let preset: VmPreset? = getOptional("/presets/nas")
+            async let presets: [VmPreset]? = getOptional("/presets/vms")
+            async let isos: [IsoImage]? = getOptional("/isos")
+            async let osStore: [OsStoreItem]? = getOptional("/os-store/systems")
+            async let osDownloads: [OsStoreItem]? = getOptional("/os-store/downloads")
+            async let remote: RemoteAccessStatus? = getOptional("/remote/status")
+            async let updateStatus: ServerUpdateStatus? = getOptional("/system/update/status")
+            async let gpus: [GpuDevice]? = getOptional("/host/gpus")
+            async let devices: [PairedDevice]? = getOptional("/pairing/devices")
+            self.compatibility = await compatibility
+            self.disks = await disks ?? []
+            self.ingestSources = await ingestSources ?? []
+            self.benchmark = await benchmark
+            self.nasPreset = await preset ?? defaultNasPreset(resources: resources)
+            self.vmPresets = await presets ?? [self.nasPreset].compactMap { $0 }
+            self.isos = await isos ?? []
+            self.osStore = await osStore ?? []
+            self.osDownloads = await osDownloads ?? []
+            self.remoteStatus = await remote
+            self.updateStatus = await updateStatus
+            self.gpus = await gpus ?? []
+            self.pairedDevices = await devices ?? []
 
             do {
                 let vms: [VmSummary] = try await get("/vms")
@@ -448,6 +450,31 @@ final class VMnasAPI: ObservableObject {
         pairedDevices = []
         windowsTuningResult = nil
         isConnected = false
+    }
+
+    private func getOptional<T: Decodable>(_ path: String) async -> T? {
+        do {
+            return try await get(path)
+        } catch {
+            return nil
+        }
+    }
+
+    private func defaultNasPreset(resources: HostResources) -> VmPreset {
+        let usableMemory = max(1, Int(resources.memoryTotalGb) - resources.hostReservedGb)
+        return VmPreset(
+            name: "nas",
+            label: "NAS",
+            osType: "linux",
+            cpuVcpus: max(1, resources.cpuLogical / 4),
+            memoryGb: max(1, min(usableMemory, Int(resources.memoryTotalGb) / 4)),
+            diskGb: 128,
+            gpuPassthrough: false,
+            notes: [
+                "Safe NAS starting point based on detected server hardware.",
+                "Install Plex, Jellyfin, Transmission, file sharing, VPN, and Docker from Apps."
+            ]
+        )
     }
 
     private func get<T: Decodable>(_ path: String) async throws -> T {
