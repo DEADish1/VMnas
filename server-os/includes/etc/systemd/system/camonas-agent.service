@@ -1,0 +1,15 @@
+[Unit]
+Description=Camo NAS management agent
+After=network-online.target pveproxy.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/camonas/server-agent
+ExecStartPre=/usr/local/sbin/camonas-generate-cert
+ExecStart=/opt/camonas/server-agent/.venv/bin/uvicorn camonas_agent.main:app --host 0.0.0.0 --port 8765 --ssl-keyfile /var/lib/camonas/certs/camonas.key --ssl-certfile /var/lib/camonas/certs/camonas.crt
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

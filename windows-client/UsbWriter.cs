@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 
-namespace VMnasAdmin.Windows;
+namespace CamoNASAdmin.Windows;
 
 public sealed record UsbWriteProgress(double? Percent, string Message);
 
@@ -34,10 +34,10 @@ public static class UsbWriter
     public static async Task WriteIsoAsync(string isoPath, List<string> guestMediaPaths, UsbDisk disk, Action<UsbWriteProgress> progress)
     {
         if (guestMediaPaths.Count > 0) throw new InvalidOperationException("Guest media is disabled for bootable server USBs until the boot-library format is complete. Remove the extra files, then write the server installer.");
-        if (new FileInfo(isoPath).Length > disk.Size) throw new InvalidOperationException("The selected USB disk is too small for the VMnas installer.");
+        if (new FileInfo(isoPath).Length > disk.Size) throw new InvalidOperationException("The selected USB disk is too small for the Camo NAS installer.");
         var encodedIso = Convert.ToBase64String(Encoding.Unicode.GetBytes(isoPath));
         var encodedId = Convert.ToBase64String(Encoding.Unicode.GetBytes(disk.UniqueId));
-        var resultPath = Path.Combine(Path.GetTempPath(), $"vmnas-usb-result-{Guid.NewGuid():N}.txt");
+        var resultPath = Path.Combine(Path.GetTempPath(), $"camonas-usb-result-{Guid.NewGuid():N}.txt");
         var encodedResultPath = Convert.ToBase64String(Encoding.Unicode.GetBytes(resultPath));
         var script = $@"
 $ErrorActionPreference = 'Stop'
@@ -80,7 +80,7 @@ try {{
     $sample++; Report (70 + 30 * $sample / $offsets.Count) ('Verified installer sample ' + $sample + ' of ' + $offsets.Count)
   }}
 }} finally {{ $verify.Dispose(); $source.Dispose() }}
-Report 100 'Bootable VMnas installer is ready and verified.'
+Report 100 'Bootable Camo NAS installer is ready and verified.'
 }} catch {{ try {{ [IO.File]::WriteAllText($resultPath, $_.Exception.Message) }} catch {{ }}; exit 1 }}";
         var encodedScript = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
         var start = new ProcessStartInfo("powershell.exe", $"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {encodedScript}")
@@ -98,7 +98,7 @@ Report 100 'Bootable VMnas installer is ready and verified.'
                 var error = File.Exists(resultPath) ? File.ReadAllText(resultPath).Trim() : "The elevated USB writer stopped without an error message.";
                 throw new InvalidOperationException(error);
             }
-            progress(new UsbWriteProgress(100, "Bootable VMnas installer is ready and verified."));
+            progress(new UsbWriteProgress(100, "Bootable Camo NAS installer is ready and verified."));
         }
         finally { if (File.Exists(resultPath)) File.Delete(resultPath); }
     }

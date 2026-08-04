@@ -1,0 +1,6 @@
+[Unit]
+Description=Check signed Camo NAS updates
+After=network-online.target
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/camonas-update

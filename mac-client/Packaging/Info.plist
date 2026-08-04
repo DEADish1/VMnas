@@ -5,13 +5,13 @@
   <key>CFBundleDevelopmentRegion</key>
   <string>en</string>
   <key>CFBundleExecutable</key>
-  <string>VMnasAdmin</string>
+  <string>CamoNASAdmin</string>
   <key>CFBundleIdentifier</key>
-  <string>local.vmnas.admin</string>
+  <string>local.camonas.admin</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
-  <string>VMnas Admin</string>
+  <string>Camo NAS Admin</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
@@ -23,13 +23,13 @@
   <key>NSHighResolutionCapable</key>
   <true/>
   <key>NSDesktopFolderUsageDescription</key>
-  <string>VMnas Admin needs access to selected ISO and IMG files on Desktop when creating installer media.</string>
+  <string>Camo NAS Admin needs access to selected ISO and IMG files on Desktop when creating installer media.</string>
   <key>NSDocumentsFolderUsageDescription</key>
-  <string>VMnas Admin needs access to the VMnas server ISO and selected guest media in Documents.</string>
+  <string>Camo NAS Admin needs access to the Camo NAS server ISO and selected guest media in Documents.</string>
   <key>NSDownloadsFolderUsageDescription</key>
-  <string>VMnas Admin needs access to downloaded operating system images selected for installer media.</string>
+  <string>Camo NAS Admin needs access to downloaded operating system images selected for installer media.</string>
   <key>NSRemovableVolumesUsageDescription</key>
-  <string>VMnas Admin needs removable volume access to create bootable VMnas installer USB drives.</string>
+  <string>Camo NAS Admin needs removable volume access to create bootable Camo NAS installer USB drives.</string>
   <key>NSSupportsAutomaticGraphicsSwitching</key>
   <true/>
 </dict>

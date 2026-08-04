@@ -1,4 +1,4 @@
-# VMnas Install Guide
+# Camo NAS Install Guide
 
 ## Requirements
 
@@ -9,7 +9,7 @@
 - Wired Ethernet
 - USB installer drive
 - Dedicated boot/server disk that can be repartitioned
-- Any existing data disks you want to keep should remain installed but not selected as the VMnas boot/server disk
+- Any existing data disks you want to keep should remain installed but not selected as the Camo NAS boot/server disk
 
 ## BIOS Settings
 
@@ -26,20 +26,20 @@ Optional:
 
 ## Install Steps
 
-1. Boot from the VMnas USB installer.
-2. Wait for the graphical VMnas installer to open.
+1. Boot from the Camo NAS USB installer.
+2. Wait for the graphical Camo NAS installer to open.
 3. Click through the guided screens:
    - Start
    - Drive
    - Admin
    - Install
-4. Confirm the selected server drive. VMnas auto-selects the first usable install drive, but you can choose another one.
+4. Confirm the selected server drive. Camo NAS auto-selects the first usable install drive, but you can choose another one.
 5. Set the admin username and password.
-6. Click `Install VMnas Server`.
+6. Click `Install Camo NAS Server`.
 7. Reboot when prompted.
-8. On first boot, VMnas automatically brings up a Proxmox bridge named `vmbr0` using DHCP on the detected wired LAN interface.
+8. On first boot, Camo NAS automatically brings up a Proxmox bridge named `vmbr0` using DHCP on the detected wired LAN interface.
 9. Read the server IP and pairing PIN from the console.
-10. Open VMnas Admin on the Mac.
+10. Open Camo NAS Admin on the Mac.
 11. Scan the QR code or enter:
 
    ```text
@@ -50,18 +50,18 @@ Optional:
 
 Advanced hardware, NAS resource, and starter module settings are available from the final Install screen, but the normal install path uses recommended defaults automatically.
 
-The installed server should not require manual shell network edits. If the console shows an unreachable address such as `10.0.2.15`, plug Ethernet directly into the home router/network and reinstall with the latest VMnas ISO so the installer can create the automatic DHCP bridge.
+The installed server should not require manual shell network edits. If the console shows an unreachable address such as `10.0.2.15`, plug Ethernet directly into the home router/network and reinstall with the latest Camo NAS ISO so the installer can create the automatic DHCP bridge.
 
 ## Install Disk Layout
 
-VMnas does not require every drive in the system to be reformatted. The installer only repartitions the selected server boot disk:
+Camo NAS does not require every drive in the system to be reformatted. The installer only repartitions the selected server boot disk:
 
-- 1 GB `VMNAS-EFI` partition for UEFI boot.
-- 96 GB `VMNAS-ROOT` partition by default for Proxmox, VMnas services, logs, kernels, and update overhead.
-- 64 GB `VMNAS-ROOT` fallback on smaller supported disks.
-- Remaining space formatted as `VMNAS-DATA` and mounted at `/var/lib/vmnas/data`.
+- 1 GB `CAMONAS-EFI` partition for UEFI boot.
+- 96 GB `CAMONAS-ROOT` partition by default for Proxmox, Camo NAS services, logs, kernels, and update overhead.
+- 64 GB `CAMONAS-ROOT` fallback on smaller supported disks.
+- Remaining space formatted as `CAMONAS-DATA` and mounted at `/var/lib/camonas/data`.
 
-Other internal drives are left untouched unless you later choose to format, pass through, or import them from the VMnas client.
+Other internal drives are left untouched unless you later choose to format, pass through, or import them from the Camo NAS client.
 
 ## After Pairing
 

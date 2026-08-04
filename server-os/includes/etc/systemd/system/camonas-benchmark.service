@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Camo NAS first boot hardware benchmark
+After=camonas-agent.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/camonas-run-benchmark
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

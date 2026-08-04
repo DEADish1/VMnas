@@ -1,0 +1,614 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "$(id -u)" -ne 0 ]]; then
+  echo "Run as root." >&2
+  exit 1
+fi
+
+PVE_CODENAME="${PVE_CODENAME:-trixie}"
+PROXMOX_KEYRING="proxmox-archive-keyring-${PVE_CODENAME}.gpg"
+PROXMOX_KEY_URL="https://enterprise.proxmox.com/debian/${PROXMOX_KEYRING}"
+HOSTNAME_VALUE="${CAMONAS_HOSTNAME:-camonas}"
+ADMIN_USER="${CAMONAS_ADMIN_USER:-camonas}"
+ADMIN_PASSWORD="${CAMONAS_ADMIN_PASSWORD:-}"
+CAMONAS_MODULES="${CAMONAS_MODULES:-security-baseline,openmediavault,docker-engine,wireguard-local-vpn,transmission}"
+TARGET_DISK="${CAMONAS_TARGET_DISK:-}"
+TARGET_ROOT="/mnt/camonas-target"
+CAMONAS_OS_SIZE_GB="${CAMONAS_OS_SIZE_GB:-96}"
+CAMONAS_MIN_OS_SIZE_GB="${CAMONAS_MIN_OS_SIZE_GB:-64}"
+CAMONAS_DATA_MOUNT="${CAMONAS_DATA_MOUNT:-/var/lib/camonas/data}"
+CAMONAS_SELECTED_OS_SIZE_GB="${CAMONAS_OS_SIZE_GB}"
+
+require_command() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "Missing required installer command: $1" >&2
+    exit 1
+  fi
+}
+
+on_error() {
+  local code="$?"
+  local line="${BASH_LINENO[0]:-unknown}"
+  echo
+  echo "Camo NAS installer failed at line ${line} with exit code ${code}." >&2
+  echo "If the code is 100, apt failed. Check the lines directly above for the missing package, bad repository, DNS issue, or GPG key problem." >&2
+  exit "${code}"
+}
+
+trap on_error ERR
+
+partition_path() {
+  local disk="$1"
+  local part="$2"
+  if [[ "${disk}" =~ (nvme|mmcblk) ]]; then
+    printf "%sp%s" "${disk}" "${part}"
+  else
+    printf "%s%s" "${disk}" "${part}"
+  fi
+}
+
+write_target_file() {
+  local path="$1"
+  install -d -m 0755 "$(dirname "${TARGET_ROOT}${path}")"
+  cat > "${TARGET_ROOT}${path}"
+}
+
+phase() {
+  echo "CAMONAS_PHASE:$1"
+}
+
+primary_ipv4() {
+  ip -o -4 route get 1.1.1.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i == "src") {print $(i+1); exit}}'
+}
+
+primary_iface() {
+  ip -o -4 route get 1.1.1.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i == "dev") {print $(i+1); exit}}'
+}
+
+fallback_wired_iface() {
+  local iface
+  for path in /sys/class/net/*; do
+    iface="$(basename "${path}")"
+    [[ "${iface}" == "lo" ]] && continue
+    [[ "${iface}" == wl* ]] && continue
+    [[ "${iface}" == docker* || "${iface}" == veth* || "${iface}" == br-* ]] && continue
+    echo "${iface}"
+    return 0
+  done
+  return 1
+}
+
+write_dhcp_bridge_config() {
+  local root="$1"
+  local iface="${CAMONAS_LAN_INTERFACE:-}"
+  if [[ -z "${iface}" ]]; then
+    iface="$(primary_iface || true)"
+  fi
+  if [[ -z "${iface}" || ! -d "/sys/class/net/${iface}" || "${iface}" == "lo" ]]; then
+    iface="$(fallback_wired_iface || true)"
+  fi
+  if [[ -z "${iface}" ]]; then
+    echo "No wired LAN interface was detected. Leaving network config for manual setup." >&2
+    return 0
+  fi
+
+  install -d -m 0755 "${root}/etc/network"
+  cat > "${root}/etc/network/interfaces" <<EOF
+auto lo
+iface lo inet loopback
+
+auto ${iface}
+iface ${iface} inet manual
+
+auto vmbr0
+iface vmbr0 inet dhcp
+        bridge-ports ${iface}
+        bridge-stp off
+        bridge-fd 0
+
+source /etc/network/interfaces.d/*
+EOF
+  echo "Configured automatic LAN bridge vmbr0 using ${iface} with DHCP."
+}
+
+run_in_target() {
+  chroot "${TARGET_ROOT}" /usr/bin/env DEBIAN_FRONTEND=noninteractive "$@"
+}
+
+apt_get_current() {
+  DEBIAN_FRONTEND=noninteractive apt-get \
+    -o Acquire::Retries=3 \
+    -o Dpkg::Options::=--force-confdef \
+    -o Dpkg::Options::=--force-confold \
+    "$@"
+}
+
+apt_get_target() {
+  run_in_target apt-get \
+    -o Acquire::Retries=3 \
+    -o Dpkg::Options::=--force-confdef \
+    -o Dpkg::Options::=--force-confold \
+    "$@"
+}
+
+set_admin_password_in_target() {
+  if [[ -n "${ADMIN_PASSWORD}" ]]; then
+    printf "%s:%s\n" "${ADMIN_USER}" "${ADMIN_PASSWORD}" | chroot "${TARGET_ROOT}" chpasswd
+    printf "root:%s\n" "${ADMIN_PASSWORD}" | chroot "${TARGET_ROOT}" chpasswd
+  fi
+}
+
+set_admin_password_current() {
+  if [[ -n "${ADMIN_PASSWORD}" ]]; then
+    printf "%s:%s\n" "${ADMIN_USER}" "${ADMIN_PASSWORD}" | chpasswd
+    printf "root:%s\n" "${ADMIN_PASSWORD}" | chpasswd
+  fi
+}
+
+harden_ssh_config() {
+  local root="$1"
+  install -d -m 0755 "${root}/etc/ssh/sshd_config.d"
+  cat > "${root}/etc/ssh/sshd_config.d/99-camonas-hardening.conf" <<'EOF'
+PermitRootLogin no
+PermitEmptyPasswords no
+PasswordAuthentication yes
+PubkeyAuthentication yes
+X11Forwarding no
+EOF
+}
+
+mount_target_systems() {
+  mount --bind /dev "${TARGET_ROOT}/dev"
+  mount --bind /dev/pts "${TARGET_ROOT}/dev/pts"
+  mount -t proc proc "${TARGET_ROOT}/proc"
+  mount -t sysfs sys "${TARGET_ROOT}/sys"
+  mount -t efivarfs efivarfs "${TARGET_ROOT}/sys/firmware/efi/efivars" 2>/dev/null || true
+}
+
+unmount_target_systems() {
+  umount -lf "${TARGET_ROOT}/sys/firmware/efi/efivars" 2>/dev/null || true
+  umount -lf "${TARGET_ROOT}/sys" 2>/dev/null || true
+  umount -lf "${TARGET_ROOT}/proc" 2>/dev/null || true
+  umount -lf "${TARGET_ROOT}/dev/pts" 2>/dev/null || true
+  umount -lf "${TARGET_ROOT}/dev" 2>/dev/null || true
+}
+
+prepare_target_disk() {
+  if [[ -z "${TARGET_DISK}" ]]; then
+    echo "No target disk selected. Installing into the current running system."
+    return 1
+  fi
+  if [[ "${CAMONAS_ERASE_CONFIRMED:-0}" != "1" ]]; then
+    echo "Refusing to erase ${TARGET_DISK} without confirmation." >&2
+    exit 1
+  fi
+  if [[ ! -b "${TARGET_DISK}" ]]; then
+    echo "Target disk is not a block device: ${TARGET_DISK}" >&2
+    exit 1
+  fi
+
+  require_command sgdisk
+  require_command partprobe
+  require_command mkfs.vfat
+  require_command mkfs.ext4
+  require_command debootstrap
+
+  local disk_bytes disk_gib os_size_gb data_size_gb
+  disk_bytes="$(blockdev --getsize64 "${TARGET_DISK}")"
+  disk_gib=$((disk_bytes / 1024 / 1024 / 1024))
+  if (( disk_gib < 80 )); then
+    echo "Target disk must be at least 80 GiB for Camo NAS OS, update overhead, and a data partition." >&2
+    exit 1
+  fi
+  os_size_gb="${CAMONAS_OS_SIZE_GB}"
+  if (( disk_gib < os_size_gb + 24 )); then
+    os_size_gb="${CAMONAS_MIN_OS_SIZE_GB}"
+  fi
+  if (( disk_gib < os_size_gb + 8 )); then
+    echo "Target disk is too small for a safe Camo NAS install. Need ${os_size_gb} GiB OS plus data overhead." >&2
+    exit 1
+  fi
+  CAMONAS_SELECTED_OS_SIZE_GB="${os_size_gb}"
+  data_size_gb=$((disk_gib - os_size_gb - 1))
+
+  phase "Partitioning target disk"
+  echo "Preparing selected server drive ${TARGET_DISK} only. Other drives will not be formatted."
+  echo "Partition plan: 1 GiB EFI, ${os_size_gb} GiB Camo NAS OS, about ${data_size_gb} GiB CAMONAS-DATA."
+  swapoff --all || true
+  umount -R "${TARGET_ROOT}" 2>/dev/null || true
+  wipefs -af "${TARGET_DISK}"
+  sgdisk --zap-all "${TARGET_DISK}"
+  sgdisk --clear \
+    --new=1:1MiB:+1024MiB --typecode=1:EF00 --change-name=1:"Camo NAS EFI" \
+    --new=2:0:+"${os_size_gb}"GiB --typecode=2:8300 --change-name=2:"Camo NAS Root" \
+    --new=3:0:0 --typecode=3:8300 --change-name=3:"Camo NAS Data" \
+    "${TARGET_DISK}"
+  partprobe "${TARGET_DISK}" || true
+  sleep 2
+
+  local efi_part root_part data_part
+  efi_part="$(partition_path "${TARGET_DISK}" 1)"
+  root_part="$(partition_path "${TARGET_DISK}" 2)"
+  data_part="$(partition_path "${TARGET_DISK}" 3)"
+
+  echo "Formatting selected server-drive partitions: ${efi_part}, ${root_part}, and ${data_part}"
+  mkfs.vfat -F32 -n CAMONAS-EFI "${efi_part}"
+  mkfs.ext4 -F -L CAMONAS-ROOT "${root_part}"
+  mkfs.ext4 -F -L CAMONAS-DATA "${data_part}"
+
+  install -d -m 0755 "${TARGET_ROOT}"
+  mount "${root_part}" "${TARGET_ROOT}"
+  install -d -m 0755 "${TARGET_ROOT}/boot/efi"
+  mount "${efi_part}" "${TARGET_ROOT}/boot/efi"
+
+  phase "Installing Debian base"
+  echo "Installing Debian ${PVE_CODENAME} base"
+  debootstrap --arch=amd64 "${PVE_CODENAME}" "${TARGET_ROOT}" http://deb.debian.org/debian
+  return 0
+}
+
+configure_target_base() {
+  local root_part efi_part data_part root_uuid efi_uuid data_uuid host_ip
+  root_part="$(partition_path "${TARGET_DISK}" 2)"
+  efi_part="$(partition_path "${TARGET_DISK}" 1)"
+  data_part="$(partition_path "${TARGET_DISK}" 3)"
+  root_uuid="$(blkid -s UUID -o value "${root_part}")"
+  efi_uuid="$(blkid -s UUID -o value "${efi_part}")"
+  data_uuid="$(blkid -s UUID -o value "${data_part}")"
+  host_ip="$(primary_ipv4)"
+
+  echo "${HOSTNAME_VALUE}" > "${TARGET_ROOT}/etc/hostname"
+  cat > "${TARGET_ROOT}/etc/hosts" <<EOF
+127.0.0.1 localhost
+${host_ip:-127.0.1.1} ${HOSTNAME_VALUE} ${HOSTNAME_VALUE}.local pvelocalhost
+
+::1 localhost ip6-localhost ip6-loopback
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+EOF
+  cp -L /etc/resolv.conf "${TARGET_ROOT}/etc/resolv.conf" 2>/dev/null || true
+  write_dhcp_bridge_config "${TARGET_ROOT}"
+
+  cat > "${TARGET_ROOT}/etc/fstab" <<EOF
+UUID=${root_uuid} / ext4 defaults,noatime 0 1
+UUID=${efi_uuid} /boot/efi vfat umask=0077 0 1
+UUID=${data_uuid} ${CAMONAS_DATA_MOUNT} ext4 defaults,noatime 0 2
+EOF
+  install -d -m 0755 "${TARGET_ROOT}${CAMONAS_DATA_MOUNT}"
+
+  cat > "${TARGET_ROOT}/etc/apt/sources.list" <<EOF
+deb http://deb.debian.org/debian ${PVE_CODENAME} main contrib non-free-firmware
+deb http://deb.debian.org/debian ${PVE_CODENAME}-updates main contrib non-free-firmware
+deb http://security.debian.org/debian-security ${PVE_CODENAME}-security main contrib non-free-firmware
+EOF
+}
+
+copy_camonas_assets_to_target() {
+  install -d -m 0755 "${TARGET_ROOT}/opt/camonas"
+  install -d -m 0755 "${TARGET_ROOT}/usr/local/sbin"
+  install -d -m 0755 "${TARGET_ROOT}/etc/systemd/system"
+  cp -R /opt/camonas/server-agent "${TARGET_ROOT}/opt/camonas/server-agent"
+  cp /etc/systemd/system/camonas-agent.service "${TARGET_ROOT}/etc/systemd/system/camonas-agent.service"
+  cp /etc/systemd/system/camonas-firstboot-info.service "${TARGET_ROOT}/etc/systemd/system/camonas-firstboot-info.service"
+  cp /etc/systemd/system/camonas-generate-cert.service "${TARGET_ROOT}/etc/systemd/system/camonas-generate-cert.service"
+  cp /etc/systemd/system/camonas-firewall.service "${TARGET_ROOT}/etc/systemd/system/camonas-firewall.service"
+  cp /etc/systemd/system/camonas-benchmark.service "${TARGET_ROOT}/etc/systemd/system/camonas-benchmark.service"
+  install -d -m 0755 "${TARGET_ROOT}/etc/avahi/services"
+  cp /etc/avahi/services/camonas.service "${TARGET_ROOT}/etc/avahi/services/camonas.service" 2>/dev/null || true
+  cp /usr/local/sbin/camonas-pairing-code "${TARGET_ROOT}/usr/local/sbin/camonas-pairing-code"
+  cp /usr/local/sbin/camonas-firstboot-info "${TARGET_ROOT}/usr/local/sbin/camonas-firstboot-info"
+  cp /usr/local/sbin/camonas-generate-cert "${TARGET_ROOT}/usr/local/sbin/camonas-generate-cert"
+  cp /usr/local/sbin/camonas-apply-firewall "${TARGET_ROOT}/usr/local/sbin/camonas-apply-firewall"
+  cp /usr/local/sbin/camonas-run-benchmark "${TARGET_ROOT}/usr/local/sbin/camonas-run-benchmark"
+  cp /usr/local/sbin/camonas-update "${TARGET_ROOT}/usr/local/sbin/camonas-update"
+  cp /usr/local/sbin/camonas-remote-update "${TARGET_ROOT}/usr/local/sbin/camonas-remote-update"
+  chmod +x "${TARGET_ROOT}/usr/local/sbin/camonas-pairing-code"
+  chmod +x "${TARGET_ROOT}/usr/local/sbin/camonas-firstboot-info"
+  chmod +x "${TARGET_ROOT}/usr/local/sbin/camonas-generate-cert"
+  chmod +x "${TARGET_ROOT}/usr/local/sbin/camonas-apply-firewall"
+  chmod +x "${TARGET_ROOT}/usr/local/sbin/camonas-run-benchmark"
+  chmod +x "${TARGET_ROOT}/usr/local/sbin/camonas-update"
+  chmod +x "${TARGET_ROOT}/usr/local/sbin/camonas-remote-update"
+}
+
+write_pairing_store() {
+  local root="$1"
+  install -d -m 0700 "${root}/var/lib/camonas"
+  python3 - "${root}/var/lib/camonas/pairing.json" <<'PY'
+import json
+import secrets
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+data = {"pin": secrets.randbelow(900000) + 100000, "devices": []}
+path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+path.chmod(0o600)
+print(f"Generated pairing PIN: {data['pin']}")
+PY
+}
+
+import_usb_iso_library() {
+  local root="$1"
+  local dest="${root}/var/lib/camonas/isos"
+  local imported=0
+  install -d -m 0755 "${dest}"
+
+  copy_media_tree() {
+    local source_dir="$1"
+    [[ -d "${source_dir}" ]] || return 0
+    shopt -s nullglob
+    for media in "${source_dir}"/*.iso "${source_dir}"/*.img "${source_dir}"/*.img.bz2; do
+      echo "Importing USB install media: ${media}"
+      if [[ "${media}" == *.img.bz2 ]]; then
+        local output="${dest}/$(basename "${media%.bz2}")"
+        if [[ ! -e "${output}" ]]; then
+          bzip2 -dc "${media}" > "${output}"
+        fi
+      else
+        cp -n "${media}" "${dest}/"
+      fi
+      imported=$((imported + 1))
+    done
+    shopt -u nullglob
+  }
+
+  for source in \
+    /media/*/CAMONAS_ISOS/isos \
+    /run/media/*/CAMONAS_ISOS/isos \
+    /mnt/CAMONAS_ISOS/isos \
+    /run/live/medium/CAMONAS_ISOS/isos; do
+    copy_media_tree "${source}"
+  done
+
+  if [[ -e /dev/disk/by-label/CAMONAS_ISOS ]]; then
+    local mount_dir="/tmp/camonas-usb-isos"
+    mkdir -p "${mount_dir}"
+    if mount -o ro /dev/disk/by-label/CAMONAS_ISOS "${mount_dir}" 2>/dev/null; then
+      copy_media_tree "${mount_dir}/isos"
+      umount "${mount_dir}" || true
+    fi
+  fi
+
+  if [[ "${imported}" -gt 0 ]]; then
+    echo "Imported ${imported} USB ISO(s) into ${dest}."
+  else
+    echo "No USB ISO library found."
+  fi
+}
+
+write_module_installer_script() {
+  local root="$1"
+  local script_path="${root}/tmp/camonas-install-selected-modules.py"
+  cat > "${script_path}" <<'PY'
+import json
+import os
+import sys
+from pathlib import Path
+
+sys.path.insert(0, "/opt/camonas/server-agent")
+
+from camonas_agent.module_installers import INSTALLERS
+from camonas_agent.store import CATALOG
+
+requested = [item.strip() for item in os.environ.get("CAMONAS_MODULES", "").split(",") if item.strip()]
+catalog = {item["id"]: item for item in CATALOG}
+seen = set()
+ordered = []
+
+def add_with_dependencies(module_id):
+    if module_id in seen:
+        return
+    seen.add(module_id)
+    for dependency in catalog.get(module_id, {}).get("dependencies", []):
+        add_with_dependencies(dependency)
+    ordered.append(module_id)
+
+for module_id in requested:
+    add_with_dependencies(module_id)
+
+state_path = Path(os.environ.get("CAMONAS_MODULE_STORE", "/var/lib/camonas/modules.json"))
+state_path.parent.mkdir(parents=True, exist_ok=True)
+state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else {}
+
+for module_id in ordered:
+    installer = INSTALLERS.get(module_id)
+    if installer:
+        print(f"Installing Camo NAS module: {module_id}")
+        try:
+            installer()
+            state[module_id] = {"install_state": "installed", "progress": 100}
+        except Exception as exc:
+            print(f"Module {module_id} failed: {exc}", file=sys.stderr)
+            state[module_id] = {"install_state": "failed", "progress": 0}
+    else:
+        print(f"Staging Camo NAS module: {module_id}")
+        state[module_id] = {"install_state": "installed", "progress": 100}
+
+state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+state_path.chmod(0o600)
+PY
+}
+
+install_selected_modules_into_target() {
+  phase "Installing selected Camo NAS modules"
+  write_module_installer_script "${TARGET_ROOT}"
+  run_in_target /usr/bin/env CAMONAS_MODULES="${CAMONAS_MODULES}" CAMONAS_MODULE_STORE="/var/lib/camonas/modules.json" CAMONAS_MODULE_ROOT="/opt/camonas/modules" python3 /tmp/camonas-install-selected-modules.py
+}
+
+install_selected_modules_current() {
+  phase "Installing selected Camo NAS modules"
+  write_module_installer_script ""
+  /usr/bin/env CAMONAS_MODULES="${CAMONAS_MODULES}" CAMONAS_MODULE_STORE="/var/lib/camonas/modules.json" CAMONAS_MODULE_ROOT="/opt/camonas/modules" python3 /tmp/camonas-install-selected-modules.py
+}
+
+install_proxmox_into_target() {
+  phase "Installing Proxmox and Camo NAS services"
+  mount_target_systems
+  trap unmount_target_systems EXIT
+
+  apt_get_target update
+  apt_get_target install -y curl ca-certificates gnupg sudo openssh-server chrony open-iscsi postfix linux-image-amd64 grub-efi-amd64 grub-pc nftables openssl avahi-daemon
+
+  run_in_target install -d -m 0755 /etc/apt/keyrings
+  echo "Downloading Proxmox archive keyring from ${PROXMOX_KEY_URL}"
+  run_in_target curl -fsSL "${PROXMOX_KEY_URL}" \
+    -o "/etc/apt/keyrings/${PROXMOX_KEYRING}"
+
+  cat > "${TARGET_ROOT}/etc/apt/sources.list.d/proxmox.sources" <<EOF
+Types: deb
+URIs: http://download.proxmox.com/debian/pve
+Suites: ${PVE_CODENAME}
+Components: pve-no-subscription
+Signed-By: /etc/apt/keyrings/${PROXMOX_KEYRING}
+EOF
+
+  apt_get_target update
+  apt_get_target full-upgrade -y
+  apt_get_target install -y proxmox-ve zfsutils-linux python3 python3-venv python3-pip xorriso bzip2
+
+  if ! run_in_target id "${ADMIN_USER}" >/dev/null 2>&1; then
+    run_in_target adduser --disabled-password --gecos "" "${ADMIN_USER}"
+    run_in_target usermod -aG sudo "${ADMIN_USER}"
+  fi
+  set_admin_password_in_target
+  harden_ssh_config "${TARGET_ROOT}"
+
+  if grep -q '^GRUB_CMDLINE_LINUX_DEFAULT=' "${TARGET_ROOT}/etc/default/grub"; then
+    sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet amd_iommu=on intel_iommu=on iommu=pt"/' "${TARGET_ROOT}/etc/default/grub"
+  fi
+
+  cat > "${TARGET_ROOT}/etc/modules-load.d/camonas-vfio.conf" <<'EOF'
+vfio
+vfio_iommu_type1
+vfio_pci
+vfio_virqfd
+EOF
+
+  copy_camonas_assets_to_target
+  run_in_target python3 -m venv /opt/camonas/server-agent/.venv
+  run_in_target /opt/camonas/server-agent/.venv/bin/pip install --upgrade pip
+  run_in_target /opt/camonas/server-agent/.venv/bin/pip install -r /opt/camonas/server-agent/requirements.txt
+  run_in_target install -d -m 0700 /var/lib/camonas
+  import_usb_iso_library "${TARGET_ROOT}"
+  install_selected_modules_into_target
+  run_in_target systemctl enable camonas-agent.service
+  run_in_target systemctl enable camonas-firstboot-info.service
+  run_in_target systemctl enable camonas-generate-cert.service
+  run_in_target systemctl enable camonas-firewall.service
+  run_in_target systemctl enable camonas-benchmark.service
+  run_in_target systemctl enable avahi-daemon.service
+  write_pairing_store "${TARGET_ROOT}"
+
+  cat > "${TARGET_ROOT}/var/lib/camonas/install-profile.json" <<EOF
+{
+  "hostname": "${HOSTNAME_VALUE}",
+  "admin_user": "${ADMIN_USER}",
+  "modules": "${CAMONAS_MODULES}",
+  "os_partition_gb": "${CAMONAS_SELECTED_OS_SIZE_GB}",
+  "data_mount": "${CAMONAS_DATA_MOUNT}",
+  "nas_cpu_vcpus": "${CAMONAS_NAS_CPU_VCPUS:-1}",
+  "nas_ram_gb": "${CAMONAS_NAS_RAM_GB:-1}"
+}
+EOF
+
+  phase "Installing bootloader"
+  echo "Installing bootloader"
+  run_in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=Camo NAS --recheck || true
+  run_in_target grub-install --target=i386-pc "${TARGET_DISK}" --recheck || true
+  run_in_target update-grub
+  run_in_target update-initramfs -u -k all || true
+
+  unmount_target_systems
+  trap - EXIT
+}
+
+install_current_system_mode() {
+  phase "Installing Proxmox and Camo NAS services"
+  echo "${HOSTNAME_VALUE}" > /etc/hostname
+  hostnamectl set-hostname "${HOSTNAME_VALUE}" || true
+  write_dhcp_bridge_config ""
+  host_ip="$(primary_ipv4)"
+  if ! grep -qE "[[:space:]]${HOSTNAME_VALUE}([[:space:]]|$)" /etc/hosts; then
+    printf "%s %s %s.local pvelocalhost\n" "${host_ip:-127.0.1.1}" "${HOSTNAME_VALUE}" "${HOSTNAME_VALUE}" >> /etc/hosts
+  fi
+
+  if ! id "${ADMIN_USER}" >/dev/null 2>&1; then
+    adduser --gecos "" "${ADMIN_USER}"
+    usermod -aG sudo "${ADMIN_USER}"
+  fi
+  set_admin_password_current
+  harden_ssh_config ""
+
+  apt_get_current update
+  apt_get_current install -y curl ca-certificates gnupg nftables openssl avahi-daemon
+
+  install -d -m 0755 /etc/apt/keyrings
+  echo "Downloading Proxmox archive keyring from ${PROXMOX_KEY_URL}"
+  curl -fsSL "${PROXMOX_KEY_URL}" \
+    -o "/etc/apt/keyrings/${PROXMOX_KEYRING}"
+
+  cat > /etc/apt/sources.list.d/proxmox.sources <<EOF
+Types: deb
+URIs: http://download.proxmox.com/debian/pve
+Suites: ${PVE_CODENAME}
+Components: pve-no-subscription
+Signed-By: /etc/apt/keyrings/${PROXMOX_KEYRING}
+EOF
+
+  apt_get_current update
+  apt_get_current full-upgrade -y
+  apt_get_current install -y proxmox-ve postfix open-iscsi chrony xorriso bzip2
+
+  if [[ -f /etc/default/grub ]]; then
+    if grep -q '^GRUB_CMDLINE_LINUX_DEFAULT=' /etc/default/grub; then
+      sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet amd_iommu=on intel_iommu=on iommu=pt"/' /etc/default/grub
+    fi
+    update-grub || true
+  fi
+
+  cat > /etc/modules-load.d/camonas-vfio.conf <<'EOF'
+vfio
+vfio_iommu_type1
+vfio_pci
+vfio_virqfd
+EOF
+
+  python3 -m venv /opt/camonas/server-agent/.venv
+  /opt/camonas/server-agent/.venv/bin/pip install --upgrade pip
+  /opt/camonas/server-agent/.venv/bin/pip install -r /opt/camonas/server-agent/requirements.txt
+  install -d -m 0700 /var/lib/camonas
+  import_usb_iso_library ""
+  install_selected_modules_current
+  systemctl enable camonas-agent.service
+  systemctl enable camonas-firstboot-info.service 2>/dev/null || true
+  systemctl enable camonas-generate-cert.service 2>/dev/null || true
+  systemctl enable camonas-firewall.service 2>/dev/null || true
+  systemctl enable camonas-benchmark.service 2>/dev/null || true
+  systemctl enable avahi-daemon.service 2>/dev/null || true
+  write_pairing_store ""
+
+  cat > /var/lib/camonas/install-profile.json <<EOF
+{
+  "hostname": "${HOSTNAME_VALUE}",
+  "admin_user": "${ADMIN_USER}",
+  "modules": "${CAMONAS_MODULES}",
+  "nas_cpu_vcpus": "${CAMONAS_NAS_CPU_VCPUS:-1}",
+  "nas_ram_gb": "${CAMONAS_NAS_RAM_GB:-1}"
+}
+EOF
+}
+
+if prepare_target_disk; then
+  configure_target_base
+  install_proxmox_into_target
+  sync
+else
+  install_current_system_mode
+fi
+
+echo
+echo "Camo NAS server base is installed."
+echo "Reboot, then open Camo NAS Admin on your Mac and pair with https://SERVER-IP:8765."
+echo "Advanced fallback only: Proxmox is available at https://SERVER-IP:8006."

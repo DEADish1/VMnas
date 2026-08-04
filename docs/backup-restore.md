@@ -1,8 +1,8 @@
-# VMnas Backup And Restore
+# Camo NAS Backup And Restore
 
 ## Goals
 
-VMnas backups should protect:
+Camo NAS backups should protect:
 
 - VM definitions
 - VM disks
@@ -12,7 +12,7 @@ VMnas backups should protect:
 
 ## Recommended Backup Layout
 
-Use at least one storage target that is not the same disk as the VMnas boot disk.
+Use at least one storage target that is not the same disk as the Camo NAS boot disk.
 
 Recommended targets:
 
@@ -23,7 +23,7 @@ Recommended targets:
 
 ## VM Backups
 
-VMnas uses Proxmox backup primitives for VM snapshots and archives.
+Camo NAS uses Proxmox backup primitives for VM snapshots and archives.
 
 Recommended default policy:
 
@@ -35,7 +35,7 @@ Recommended default policy:
 The Backup Scheduler module stages this default policy at:
 
 ```text
-/opt/vmnas/modules/backup-scheduler/backup-policy.json
+/opt/camonas/modules/backup-scheduler/backup-policy.json
 ```
 
 ## NAS Data
@@ -50,22 +50,22 @@ Best practice:
 
 ## Pairing And Module State
 
-Important VMnas state:
+Important Camo NAS state:
 
 ```text
-/var/lib/vmnas/
-/opt/vmnas/modules/
+/var/lib/camonas/
+/opt/camonas/modules/
 ```
 
 Back up these paths after setup and whenever modules are changed.
 
 ## Restore Flow
 
-1. Reinstall VMnas if the boot disk failed.
+1. Reinstall Camo NAS if the boot disk failed.
 2. Pair an admin device.
-3. Restore `/var/lib/vmnas/`.
-4. Restore `/opt/vmnas/modules/`.
-5. Restore VM backups through the VMnas client or Proxmox.
+3. Restore `/var/lib/camonas/`.
+4. Restore `/opt/camonas/modules/`.
+5. Restore VM backups through the Camo NAS client or Proxmox.
 6. Reboot the server.
 7. Confirm VM list, module list, and remote access state.
 

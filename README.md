@@ -1,10 +1,10 @@
-# VMnas
+# Camo NAS
 
-VMnas is a plan for turning a desktop-class machine into a small virtualization server with a web UI for creating VMs, assigning CPU/RAM/storage, and running a NAS role. The default NAS setup is also the home VPN and download hub, with WireGuard and Transmission included.
+Camo NAS is a plan for turning a desktop-class machine into a small virtualization server with a web UI for creating VMs, assigning CPU/RAM/storage, and running a NAS role. The default NAS setup is also the home VPN and download hub, with WireGuard and Transmission included.
 
 This repository now contains the first implementation skeleton:
 
-- `server-os/`: custom VMnas server ISO builder
+- `server-os/`: custom Camo NAS server ISO builder
 - `server-agent/`: FastAPI management agent installed onto the server
 - `mac-client/`: native SwiftUI Mac admin client
 - `windows-client/`: native WPF Windows installer-USB client
@@ -21,22 +21,22 @@ The current MacBook can be used for planning, UI prototyping, remote administrat
 
 - CPU with AMD-V/SVM or Intel VT-x enabled in BIOS
 - IOMMU enabled in BIOS if passing through disks, GPUs, or controllers
-- Enough RAM for the VMs you plan to run; VMnas detects total/available RAM and sizes presets from the host
+- Enough RAM for the VMs you plan to run; Camo NAS detects total/available RAM and sizes presets from the host
 - SSD/NVMe boot disk for the hypervisor; only the selected boot disk is repartitioned during install
-- Separate storage disks for NAS data when possible; VMnas leaves non-selected disks untouched until the user explicitly assigns or formats them
+- Separate storage disks for NAS data when possible; Camo NAS leaves non-selected disks untouched until the user explicitly assigns or formats them
 - Wired Ethernet, ideally 2.5 GbE or faster
 - UPS strongly recommended for NAS workloads
 
 ## GPU Passthrough Notes
 
-Desktop virtualization hosts are a strong fit for VMnas, especially if the motherboard exposes clean IOMMU groups.
+Desktop virtualization hosts are a strong fit for Camo NAS, especially if the motherboard exposes clean IOMMU groups.
 
 For Windows gaming, SteamOS, CUDA, rendering, AI, or GPU-heavy workloads inside a VM, use PCIe GPU passthrough:
 
 - Enable SVM/AMD-V in BIOS.
 - Enable IOMMU in BIOS.
-- Prefer a second GPU or integrated graphics for the host if available. A good desktop layout is AMD or integrated graphics for VMnas/Proxmox display duties and an NVIDIA/AMD dedicated GPU assigned to gaming VMs.
-- Pass a dedicated GPU through to one VM at a time. VMnas detects AMD, NVIDIA, Intel, and other PCI display controllers and lets the user choose the exact GPU when creating a VM.
+- Prefer a second GPU or integrated graphics for the host if available. A good desktop layout is AMD or integrated graphics for Camo NAS/Proxmox display duties and an NVIDIA/AMD dedicated GPU assigned to gaming VMs.
+- Pass a dedicated GPU through to one VM at a time. Camo NAS detects AMD, NVIDIA, Intel, and other PCI display controllers and lets the user choose the exact GPU when creating a VM.
 - Bind the passthrough GPU to `vfio-pci` on the host so Proxmox/Linux does not claim it.
 - Use OVMF/UEFI and machine type `q35` for the passthrough VM.
 - Expect the GPU to be unavailable to the host while assigned to a VM.
@@ -53,11 +53,11 @@ Example on a 12-core, 64 GB host:
 - NAS VM RAM: 16 GB
 - Remaining host/VM pool: 9 CPU cores and 48 GB RAM, minus hypervisor overhead
 
-VMnas calculates this from detected logical CPU threads and installed RAM instead of assuming a fixed host size.
+Camo NAS calculates this from detected logical CPU threads and installed RAM instead of assuming a fixed host size.
 
 ## Resource Slider Model
 
-The first version can use Proxmox directly. A later VMnas web UI can wrap the Proxmox API and expose:
+The first version can use Proxmox directly. A later Camo NAS web UI can wrap the Proxmox API and expose:
 
 - CPU slider: vCPU count from 1 to host maximum, capped by policy
 - RAM slider: VM memory in GB, with a reserved amount kept for the host
@@ -83,7 +83,7 @@ Best if the goal is a working server quickly and smoothly.
 - Supports console access from the browser with noVNC
 - Supports remote desktop workflows through RDP, SSH, and SPICE depending on guest OS
 
-### Option B: Custom VMnas Controller
+### Option B: Custom Camo NAS Controller
 
 Best as a second phase after Proxmox is running.
 
@@ -121,7 +121,7 @@ The Mac client includes a `System Test` screen with `Live Mode` and a server ben
 
 The test uses live connected-server data from `/host/resources`, `/host/disks`, `/host/gpus`, and `/host/compatibility`; it does not assume a fixed CPU, RAM, storage layout, or GPU.
 
-After server software is installed, VMnas runs a first-boot benchmark and saves the result. Users can run it again from the Mac client. The benchmark checks short CPU, memory, and disk samples, then recommends conservative limits for simultaneous VMs, Windows VMs, Linux VMs, containers, NAS use, and GPU passthrough.
+After server software is installed, Camo NAS runs a first-boot benchmark and saves the result. Users can run it again from the Mac client. The benchmark checks short CPU, memory, and disk samples, then recommends conservative limits for simultaneous VMs, Windows VMs, Linux VMs, containers, NAS use, and GPU passthrough.
 
 ## NAS VM Notes
 
@@ -134,7 +134,7 @@ For real data safety, avoid stacking too many storage layers. The cleanest NAS V
 
 ## Installer Storage Layout
 
-The server installer only modifies the selected VMnas boot/server drive. It creates a 1 GB EFI partition, a right-sized VMnas OS partition with update overhead, and formats the remaining boot-drive space as `VMNAS-DATA` mounted at `/var/lib/vmnas/data`. The default OS partition is 96 GB, with a 64 GB fallback for smaller supported drives. Other disks are detected but not reformatted by the installer.
+The server installer only modifies the selected Camo NAS boot/server drive. It creates a 1 GB EFI partition, a right-sized Camo NAS OS partition with update overhead, and formats the remaining boot-drive space as `CAMONAS-DATA` mounted at `/var/lib/camonas/data`. The default OS partition is 96 GB, with a 64 GB fallback for smaller supported drives. Other disks are detected but not reformatted by the installer.
 
 ## Practical First Milestone
 
@@ -154,7 +154,7 @@ Access and administer the server from the Mac through:
 - SSH or web dashboards for Linux/NAS VM daily use
 - Tailscale or WireGuard for secure remote access away from home
 
-After that works, build VMnas as a custom web UI that talks to the Proxmox API.
+After that works, build Camo NAS as a custom web UI that talks to the Proxmox API.
 
 ## Build The Server ISO
 
@@ -168,50 +168,50 @@ On macOS, Docker Desktop must be installed and running before `make iso` can wor
 
 ```bash
 sudo apt-get install -y live-build xorriso isolinux syslinux-common squashfs-tools
-VMNAS_DIRECT_LIVE_BUILD=1 ./server-os/build-iso.sh
+CAMONAS_DIRECT_LIVE_BUILD=1 ./server-os/build-iso.sh
 ```
 
 The expected output is:
 
 ```text
-dist/vmnas-server-trixie-amd64.iso
-dist/vmnas-server-trixie-amd64.iso.sha256
+dist/camonas-server-trixie-amd64.iso
+dist/camonas-server-trixie-amd64.iso.sha256
 ```
 
-The ISO is currently a Debian Trixie live/install base with VMnas install assets included. After installing Debian on the server desktop, run:
+The ISO is currently a Debian Trixie live/install base with Camo NAS install assets included. After installing Debian on the server desktop, run:
 
 ```bash
-sudo vmnas-install-proxmox
+sudo camonas-install-proxmox
 ```
 
-That installs Proxmox VE, enables IOMMU boot flags, installs the VMnas agent, and enables the service.
+That installs Proxmox VE, enables IOMMU boot flags, installs the Camo NAS agent, and enables the service.
 
 ## Simple Graphical Install Flow
 
-The server ISO now includes a VMnas graphical installer shell.
+The server ISO now includes a Camo NAS graphical installer shell.
 
 Expected user flow:
 
-1. Boot the server desktop from the VMnas USB installer.
-2. The live desktop auto-opens the VMnas installer.
+1. Boot the server desktop from the Camo NAS USB installer.
+2. The live desktop auto-opens the Camo NAS installer.
 3. Follow the plain guided installer: Start, Drive, Admin, Install.
 4. Confirm the selected server drive and set the admin password.
-5. Click `Install VMnas Server`.
+5. Click `Install Camo NAS Server`.
 6. Reboot when prompted.
-7. VMnas automatically creates the Proxmox `vmbr0` LAN bridge with DHCP on the detected wired interface.
+7. Camo NAS automatically creates the Proxmox `vmbr0` LAN bridge with DHCP on the detected wired interface.
 8. Scan the pairing QR code or use the pairing PIN shown on screen.
-9. Open VMnas Admin on Mac, iPhone, Android, or a browser client and pair.
+9. Open Camo NAS Admin on Mac, iPhone, Android, or a browser client and pair.
 
 The normal path uses recommended settings automatically. Advanced hardware, NAS resource, and starter module settings are tucked into the final Install screen for users who want to adjust them.
 
-The default module selection installs Security Baseline, OpenMediaVault NAS, Docker Engine, WireGuard Local VPN, and Transmission BitTorrent. Transmission stores downloads under `/srv/vmnas/downloads`, watches `/srv/vmnas/watch`, and exposes its authenticated web UI on port `9091` for trusted LAN/VPN use.
+The default module selection installs Security Baseline, OpenMediaVault NAS, Docker Engine, WireGuard Local VPN, and Transmission BitTorrent. Transmission stores downloads under `/srv/camonas/downloads`, watches `/srv/camonas/watch`, and exposes its authenticated web UI on port `9091` for trusted LAN/VPN use.
 
 The installer UI lives in:
 
 - `server-os/installer-ui/index.html`
 - `server-os/installer-ui/styles.css`
 - `server-os/installer-ui/app.js`
-- `server-os/installer-api/vmnas_installer_api.py`
+- `server-os/installer-api/camonas_installer_api.py`
 
 The visual style is intentionally aligned with the Mac client: simple sidebar, light panels, 8px corners, clear resource controls, and a module selection grid.
 
@@ -286,7 +286,7 @@ Open `mac-client/Package.swift` in Xcode, or build with Swift Package Manager:
 ```bash
 cd mac-client
 swift build
-swift run VMnasAdmin
+swift run CamoNASAdmin
 ```
 
 ## Build The Windows Installer-USB Client
@@ -294,7 +294,7 @@ swift run VMnasAdmin
 On Windows with .NET 8, WSL 2, and Docker Desktop installed and running:
 
 ```powershell
-dotnet run --project .\windows-client\VMnasAdmin.Windows.csproj
+dotnet run --project .\windows-client\CamoNASAdmin.Windows.csproj
 ```
 
 The Windows client can build the server ISO through WSL and write it to a selected USB drive after an explicit erase confirmation. See `windows-client/README.md` for prerequisites and usage.
@@ -317,7 +317,7 @@ The Mac client is the primary easy-use admin surface. It includes:
 - Download status view
 - Settings for server URL and access preferences
 
-The Module Store is designed so users can click `Download` for capabilities the server needs. It is hidden in the Mac client until the Mac is paired with and connected to a running VMnas server, because modules install on the server and not on the client device. Current planned modules include:
+The Module Store is designed so users can click `Download` for capabilities the server needs. It is hidden in the Mac client until the Mac is paired with and connected to a running Camo NAS server, because modules install on the server and not on the client device. Current planned modules include:
 
 - OpenMediaVault NAS
 - TrueNAS SCALE
@@ -345,7 +345,7 @@ The Module Store is designed so users can click `Download` for capabilities the 
 - WireGuard Local VPN Server
 - Monitoring Dashboard
 
-The OS Store is separate from the Module Store. It lists common guest operating systems and NAS/router appliances, then downloads supported installer media into the VMnas media library. VMnas supports `.iso`, `.img`, and compressed `.img.bz2` uploads/imports; compressed disk images are expanded to `.img` on the server. OSes that require an official web flow, license agreement, or account open the vendor download page instead.
+The OS Store is separate from the Module Store. It lists common guest operating systems and NAS/router appliances, then downloads supported installer media into the Camo NAS media library. Camo NAS supports `.iso`, `.img`, and compressed `.img.bz2` uploads/imports; compressed disk images are expanded to `.img` on the server. OSes that require an official web flow, license agreement, or account open the vendor download page instead.
 
 Current OS Store families:
 
@@ -356,28 +356,28 @@ Current OS Store families:
 - Network: pfSense CE
 - Backup: Proxmox Backup Server
 
-Downloaded Linux media can be launched into the `Create VM` screen from the OS Store. VMnas preselects the downloaded installer media so the user can size the VM and create it without manually hunting for the file path. ISO media is attached as a CD-ROM installer; IMG media, including SteamOS images decompressed from `.img.bz2`, is imported as the VM boot disk.
+Downloaded Linux media can be launched into the `Create VM` screen from the OS Store. Camo NAS preselects the downloaded installer media so the user can size the VM and create it without manually hunting for the file path. ISO media is attached as a CD-ROM installer; IMG media, including SteamOS images decompressed from `.img.bz2`, is imported as the VM boot disk.
 
 ## Server Drive Import
 
-The server agent detects internal drives, USB flash drives, USB hard drives, and mounted extra storage drives. The Mac client and server web UI show which drives are safe import sources, whether they are mounted, their filesystem, their size, and the next simple action. VMnas does not reformat plugged-in import drives; it treats them as sources for copying media, ISOs, backups, and other files into the NAS library.
+The server agent detects internal drives, USB flash drives, USB hard drives, and mounted extra storage drives. The Mac client and server web UI show which drives are safe import sources, whether they are mounted, their filesystem, their size, and the next simple action. Camo NAS does not reformat plugged-in import drives; it treats them as sources for copying media, ISOs, backups, and other files into the NAS library.
 
 ## Installer USB
 
-The Mac client includes an `Installer USB` screen for preparing the server installer with as few steps as possible. This utility runs on the Mac and is available before pairing with a server. It automatically checks for `dist/vmnas-server-trixie-amd64.iso` and loads the VMnas server ISO into the installer field when present. If the ISO has not been built yet, the screen includes a `Build Server ISO` action. The USB boots the VMnas server installer first, always adds a writable `VMNAS_LOGS` report partition for failed install diagnostics, then can add a separate `VMNAS_ISOS` library partition with extra guest OS media for the installed server to import:
+The Mac client includes an `Installer USB` screen for preparing the server installer with as few steps as possible. This utility runs on the Mac and is available before pairing with a server. It automatically checks for `dist/camonas-server-trixie-amd64.iso` and loads the Camo NAS server ISO into the installer field when present. If the ISO has not been built yet, the screen includes a `Build Server ISO` action. The USB boots the Camo NAS server installer first, always adds a writable `CAMONAS_LOGS` report partition for failed install diagnostics, then can add a separate `CAMONAS_ISOS` library partition with extra guest OS media for the installed server to import:
 
-1. Auto-load or build the VMnas server ISO.
+1. Auto-load or build the Camo NAS server ISO.
 2. Optionally add Windows, Linux, NAS, router, rescue, or SteamOS image media to the Server ISO Library.
 3. Select a detected removable USB drive.
 4. Click `Make Installer USB`.
 
-VMnas only lists external removable/ejectable disks, asks for confirmation before erasing, then uses macOS admin authorization for the actual write.
+Camo NAS only lists external removable/ejectable disks, asks for confirmation before erasing, then uses macOS admin authorization for the actual write.
 
-If the server install fails, the live installer writes a timestamped folder to `VMNAS_LOGS/reports` on the flash drive. The report includes the install log, hardware detection, disk layout, PCI devices, network state, mount table, kernel warnings, and safe install settings with the admin password redacted. Plug the flash drive back into the Mac and use the newest report folder for troubleshooting.
+If the server install fails, the live installer writes a timestamped folder to `CAMONAS_LOGS/reports` on the flash drive. The report includes the install log, hardware detection, disk layout, PCI devices, network state, mount table, kernel warnings, and safe install settings with the admin password redacted. Plug the flash drive back into the Mac and use the newest report folder for troubleshooting.
 
 ## Windows VM Tuning
 
-When creating a Windows VM, the Mac client can attach optional VMnas Windows tuning media. VMnas generates a supported Windows Setup answer file plus a first-logon PowerShell script so users can choose common setup cleanup options:
+When creating a Windows VM, the Mac client can attach optional Camo NAS Windows tuning media. Camo NAS generates a supported Windows Setup answer file plus a first-logon PowerShell script so users can choose common setup cleanup options:
 
 - Create a local admin account for the VM.
 - Skip Microsoft account screens when supported by Windows Setup.
@@ -388,7 +388,7 @@ When creating a Windows VM, the Mac client can attach optional VMnas Windows tun
 
 The tuning media does not bypass Windows licensing or activation. It only applies the options selected in the Create VM screen.
 
-The Mac client also includes a `Windows Tuning` screen for testing these settings against an existing VM. Pick the VM, adjust toggles, then attach test media. Inside Windows, open the `VMNAS_WIN_TUNE` disc and run `vmnas-firstlogon.ps1` as Administrator to test the selected settings.
+The Mac client also includes a `Windows Tuning` screen for testing these settings against an existing VM. Pick the VM, adjust toggles, then attach test media. Inside Windows, open the `CAMONAS_WIN_TUNE` disc and run `camonas-firstlogon.ps1` as Administrator to test the selected settings.
 
 ## VM Live View
 
@@ -399,7 +399,7 @@ Running VMs have a `Live` button in the Mac client. It opens an embedded PiP-sty
 - `60 Hz`: lower bandwidth/battery profile.
 - Security Baseline
 
-The client now loads the module catalog from the VMnas agent and sends download/install requests to the server. The first server implementation tracks module state and dependencies persistently; later module installers will replace simulated installs with real package, VM template, and container deployment steps.
+The client now loads the module catalog from the Camo NAS agent and sends download/install requests to the server. The first server implementation tracks module state and dependencies persistently; later module installers will replace simulated installs with real package, VM template, and container deployment steps.
 
 Implemented server-side module installers:
 
@@ -412,11 +412,11 @@ Implemented server-side module installers:
 - Tailscale: stages remote access notes and installs the package when available
 - WireGuard Local VPN Server: installs WireGuard tools and stages server/client VPN templates
 - Transmission BitTorrent: deploys a managed Transmission container for the NAS download hub
-- Plex Media Server: deploys a managed streaming container mapped to `/srv/vmnas/media`
+- Plex Media Server: deploys a managed streaming container mapped to `/srv/camonas/media`
 - Jellyfin Media Server: deploys a managed streaming container mapped to media and photo libraries
-- Emby Media Server: deploys a managed streaming container mapped to `/srv/vmnas/media`
-- Navidrome Music Server: deploys private music streaming from `/srv/vmnas/media/music`
-- Audiobookshelf: deploys audiobook and podcast streaming from the VMnas media library
+- Emby Media Server: deploys a managed streaming container mapped to `/srv/camonas/media`
+- Navidrome Music Server: deploys private music streaming from `/srv/camonas/media/music`
+- Audiobookshelf: deploys audiobook and podcast streaming from the Camo NAS media library
 - ErsatzTV: deploys custom live-style channels from local NAS media
 - Arr Media Automation: deploys Sonarr, Radarr, Prowlarr, and qBittorrent
 - Monitoring: installs Prometheus Node Exporter when available
@@ -424,14 +424,14 @@ Implemented server-side module installers:
 
 ## Pairing Clients
 
-VMnas is designed so a Mac, iPhone, Android phone, tablet, or future web client can pair with the server.
+Camo NAS is designed so a Mac, iPhone, Android phone, tablet, or future web client can pair with the server.
 
 First version flow:
 
-1. On the VMnas server, show the pairing code:
+1. On the Camo NAS server, show the pairing code:
 
    ```bash
-   sudo vmnas-pairing-code
+   sudo camonas-pairing-code
    ```
 
 2. On the Mac client, open `Settings`.
@@ -439,29 +439,29 @@ First version flow:
 4. Enter the pairing PIN.
 5. Click `Pair Device`.
 
-Pairing QR codes use a JSON payload with `type: "vmnas-pairing"`. The QR contains the server API URL, candidate local URLs, PIN, pairing endpoint, status endpoint, discovery endpoint, and payload version so iPhone, Android, Mac, and browser clients can scan once and pair without manually typing the server address.
+Pairing QR codes use a JSON payload with `type: "camonas-pairing"`. The QR contains the server API URL, candidate local URLs, PIN, pairing endpoint, status endpoint, discovery endpoint, and payload version so iPhone, Android, Mac, and browser clients can scan once and pair without manually typing the server address.
 
-The server returns a long device token. The Mac client stores this token in macOS Keychain and sends it with admin requests. Once at least one device is paired, VMnas requires a valid paired-device token for server control endpoints.
+The server returns a long device token. The Mac client stores this token in macOS Keychain and sends it with admin requests. Once at least one device is paired, Camo NAS requires a valid paired-device token for server control endpoints.
 
 ## Remote Access
 
-After a device is paired locally, VMnas can enable server-side remote access through the Tailscale module.
+After a device is paired locally, Camo NAS can enable server-side remote access through the Tailscale module.
 
 Flow:
 
 1. Pair the Mac, iPhone, Android device, or browser client on the local network.
 2. Open `Network` or `Settings` in the Mac client.
 3. Click `Enable Remote Access`.
-4. VMnas installs/enables the Tailscale remote access module when available.
-5. Once authenticated, the client shows the server's remote IP and VMnas API URL.
+4. Camo NAS installs/enables the Tailscale remote access module when available.
+5. Once authenticated, the client shows the server's remote IP and Camo NAS API URL.
 
-This avoids opening router ports directly. VMnas also requires paired-device tokens on admin endpoints once a device has been paired. The installed VMnas agent runs over HTTPS on port `8765`; the installer generates a local server certificate during setup. Tailscale/WireGuard-style remote access gives the outside-home path an encrypted private network layer.
+This avoids opening router ports directly. Camo NAS also requires paired-device tokens on admin endpoints once a device has been paired. The installed Camo NAS agent runs over HTTPS on port `8765`; the installer generates a local server certificate during setup. Tailscale/WireGuard-style remote access gives the outside-home path an encrypted private network layer.
 
 Firewall defaults:
 
 - Allow SSH on `22`
 - Allow Proxmox on `8006`
-- Allow VMnas HTTPS API on `8765`
+- Allow Camo NAS HTTPS API on `8765`
 - Allow Tailscale UDP on `41641`
 - Allow traffic from `tailscale0`
 - Drop other inbound traffic by default
@@ -469,19 +469,19 @@ Firewall defaults:
 To rotate the pairing PIN on the server:
 
 ```bash
-sudo vmnas-pairing-code --rotate
+sudo camonas-pairing-code --rotate
 ```
 
 The Mac client can also rotate the pairing PIN, show a QR code for mobile pairing, list paired devices, and revoke devices that should no longer control the server.
 
 ## Discovery And Browser Client
 
-Installed VMnas servers advertise themselves on the local network using Avahi/mDNS:
+Installed Camo NAS servers advertise themselves on the local network using Avahi/mDNS:
 
-- `_vmnas._tcp` on port `8765`
+- `_camonas._tcp` on port `8765`
 - `_https._tcp` on port `8765`
 
-The VMnas agent also serves a lightweight browser client at:
+The Camo NAS agent also serves a lightweight browser client at:
 
 ```text
 https://SERVER-IP:8765/
@@ -498,7 +498,7 @@ Additional release docs:
 
 ## First-Run Admin Hardening
 
-The installer requires an admin password before installation starts. VMnas also writes SSH hardening defaults:
+The installer requires an admin password before installation starts. Camo NAS also writes SSH hardening defaults:
 
 - Root SSH login disabled
 - Empty passwords disabled

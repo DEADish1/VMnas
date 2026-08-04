@@ -40,8 +40,8 @@ function selectedModules() {
 function installPayload() {
   clampResourceValues();
   return {
-    hostname: document.querySelector("#hostname").value.trim() || "vmnas",
-    admin_user: document.querySelector("#admin-user").value.trim() || "vmnas",
+    hostname: document.querySelector("#hostname").value.trim() || "camonas",
+    admin_user: document.querySelector("#admin-user").value.trim() || "camonas",
     admin_password: document.querySelector("#admin-password").value,
     timezone: document.querySelector("#timezone").value.trim() || "America/New_York",
     nas_cpu_vcpus: Number(document.querySelector("#nas-cpu").value),
@@ -69,7 +69,7 @@ function installBlockedReason() {
   const confirm = document.querySelector("#admin-password-confirm").value;
   const selectedInput = document.querySelector('input[name="target-disk"]:checked');
   if (!detectedHardware) return "Waiting for hardware detection before install can start.";
-  if (!selectedDisk || !selectedInput) return "Choose the server drive to install VMnas on.";
+  if (!selectedDisk || !selectedInput) return "Choose the server drive to install Camo NAS on.";
   if (selectedInput.dataset.installable !== "true") return "Choose an installable server drive.";
   if (document.querySelector("#erase-confirmation").value.trim().toUpperCase() !== "ERASE") return "Confirm the selected server drive can be erased.";
   if (password.length < 8) return "Set an admin password with at least 8 characters.";
@@ -89,7 +89,7 @@ function updateInstallButton() {
 
 function updateReview() {
   const diskLabel = selectedDisk || "Choose a drive";
-  const adminUser = document.querySelector("#admin-user").value.trim() || "vmnas";
+  const adminUser = document.querySelector("#admin-user").value.trim() || "camonas";
   const password = document.querySelector("#admin-password").value;
   const confirm = document.querySelector("#admin-password-confirm").value;
   const network = detectedHardware && detectedHardware.network ? detectedHardware.network : "Checking";
@@ -190,8 +190,8 @@ async function loadDisks() {
       const installable = plan.installable !== false;
       const disabled = installable ? "" : "disabled";
       const dataText = installable
-        ? `Plan: 1 GB EFI · ${plan.os_gb} GB VMnas OS · ${plan.data_gb} GB VMNAS-DATA`
-        : "Too small for VMnas OS plus a usable data partition";
+        ? `Plan: 1 GB EFI · ${plan.os_gb} GB Camo NAS OS · ${plan.data_gb} GB CAMONAS-DATA`
+        : "Too small for Camo NAS OS plus a usable data partition";
       return `
       <label class="disk-option ${installable ? "" : "disabled"}">
         <input type="radio" name="target-disk" value="${disk.path}" data-installable="${installable}" ${disabled}>
@@ -223,7 +223,7 @@ function selectDisk(path, disks) {
   });
   const disk = disks.find((item) => item.path === selectedDisk);
   const plan = disk && disk.plan ? disk.plan : {};
-  document.querySelector("#selected-disk-summary").textContent = `${selectedDisk} only will be repartitioned. Other drives are left untouched. VMnas will create a ${plan.os_gb || 96} GB OS partition and a ready ${plan.data_gb || 0} GB VMNAS-DATA partition.`;
+  document.querySelector("#selected-disk-summary").textContent = `${selectedDisk} only will be repartitioned. Other drives are left untouched. Camo NAS will create a ${plan.os_gb || 96} GB OS partition and a ready ${plan.data_gb || 0} GB CAMONAS-DATA partition.`;
   updateInstallButton();
 }
 
@@ -250,8 +250,8 @@ function updatePairingView(pairing) {
   }
   const payload = pairing.payload || {};
   document.querySelector("#pair-url").textContent = payload.api_url
-    ? `QR includes ${payload.api_url}, pairing PIN, and VMnas pairing endpoints.`
-    : "QR includes the server address, pairing PIN, and VMnas pairing endpoints.";
+    ? `QR includes ${payload.api_url}, pairing PIN, and Camo NAS pairing endpoints.`
+    : "QR includes the server address, pairing PIN, and Camo NAS pairing endpoints.";
 }
 
 async function pollInstall() {
@@ -307,7 +307,7 @@ installButton.addEventListener("click", async () => {
   if (!installReady()) return;
   installButton.disabled = true;
   statusPill.textContent = "running";
-  log.textContent = "Starting VMnas installation...\n";
+  log.textContent = "Starting Camo NAS installation...\n";
   try {
     await postJSON("/api/install/start", installPayload());
     failureHelp.classList.add("hidden");

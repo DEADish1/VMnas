@@ -1,16 +1,16 @@
-# VMnas Update Process
+# Camo NAS Update Process
 
 ## Update Types
 
-VMnas has three update layers:
+Camo NAS has three update layers:
 
 - Server OS and Proxmox packages
-- VMnas server agent
+- Camo NAS server agent
 - Mac/mobile/browser clients
 
 ## Server OS Updates
 
-Use the VMnas client update flow when available. Manual fallback:
+Use the Camo NAS client update flow when available. Manual fallback:
 
 ```bash
 sudo apt update
@@ -18,21 +18,21 @@ sudo apt full-upgrade
 sudo reboot
 ```
 
-## VMnas Agent Updates
+## Camo NAS Agent Updates
 
-The VMnas agent lives at:
+The Camo NAS agent lives at:
 
 ```text
-/opt/vmnas/server-agent
+/opt/camonas/server-agent
 ```
 
 Future release installers should:
 
-1. Stop `vmnas-agent`.
-2. Back up `/opt/vmnas/server-agent`.
+1. Stop `camonas-agent`.
+2. Back up `/opt/camonas/server-agent`.
 3. Install the new agent.
 4. Reinstall Python requirements.
-5. Start `vmnas-agent`.
+5. Start `camonas-agent`.
 6. Run `/health`.
 
 ## Module Updates
@@ -40,7 +40,7 @@ Future release installers should:
 Modules live under:
 
 ```text
-/opt/vmnas/modules
+/opt/camonas/modules
 ```
 
 Module updates should preserve:
@@ -59,14 +59,14 @@ Mac client updates should preserve the Keychain token. If the token is lost, pai
 Before updating:
 
 1. Create VM snapshots if needed.
-2. Back up `/var/lib/vmnas`.
-3. Back up `/opt/vmnas/modules`.
+2. Back up `/var/lib/camonas`.
+3. Back up `/opt/camonas/modules`.
 4. Confirm remote access is working.
 
 If an update fails:
 
 1. Use Proxmox local console or SSH.
-2. Restore the previous VMnas agent directory.
-3. Restart `vmnas-agent`.
+2. Restore the previous Camo NAS agent directory.
+3. Restart `camonas-agent`.
 4. Re-pair a client if token state was restored from an old backup.
 

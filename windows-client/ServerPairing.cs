@@ -3,15 +3,15 @@ using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace VMnasAdmin.Windows;
+namespace CamoNASAdmin.Windows;
 
 public sealed class ServerPairing
 {
-    internal const string CredentialPrefix = "VMnasAdmin:";
+    internal const string CredentialPrefix = "CamoNASAdmin:";
 
     public async Task PairAsync(string serverUrl, string deviceName, string pin)
     {
-        if (!Uri.TryCreate(serverUrl, UriKind.Absolute, out var baseUri) || baseUri.Scheme != Uri.UriSchemeHttps) throw new InvalidOperationException("Use an HTTPS VMnas server URL.");
+        if (!Uri.TryCreate(serverUrl, UriKind.Absolute, out var baseUri) || baseUri.Scheme != Uri.UriSchemeHttps) throw new InvalidOperationException("Use an HTTPS Camo NAS server URL.");
         if (string.IsNullOrWhiteSpace(deviceName) || string.IsNullOrWhiteSpace(pin)) throw new InvalidOperationException("Enter a device name and pairing PIN.");
         using var client = new HttpClient { BaseAddress = baseUri };
         using var response = await client.PostAsJsonAsync("/pairing/pair", new { device_name = deviceName.Trim(), pin = pin.Trim() });
@@ -28,7 +28,7 @@ public sealed class ServerPairing
         client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
         using var response = await client.GetAsync("/health");
         response.EnsureSuccessStatusCode();
-        return "Connected to VMnas server.";
+        return "Connected to Camo NAS server.";
     }
 
     public async Task<List<VmSummary>> VmsAsync(string serverUrl)
@@ -77,7 +77,7 @@ internal static class CredentialStore
     {
         var target = ServerPairing.CredentialPrefix + serverUrl;
         var targetPtr = Marshal.StringToCoTaskMemUni(target);
-        var userPtr = Marshal.StringToCoTaskMemUni("VMnas device token");
+        var userPtr = Marshal.StringToCoTaskMemUni("Camo NAS device token");
         var blob = Encoding.Unicode.GetBytes(token);
         var blobPtr = Marshal.AllocCoTaskMem(blob.Length);
         try

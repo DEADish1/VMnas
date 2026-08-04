@@ -1,0 +1,1032 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Camo NAS Server</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #eef3f4;
+        --panel: #ffffff;
+        --panel-soft: #f7faf9;
+        --text: #172326;
+        --muted: #637174;
+        --line: #d9e2e3;
+        --strong: #155e63;
+        --strong-2: #0f766e;
+        --warn: #9a3412;
+        --bad: #b91c1c;
+        --good: #047857;
+        --shadow: 0 18px 46px rgba(17, 35, 38, 0.12);
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      button, input {
+        font: inherit;
+      }
+
+      button {
+        min-height: 38px;
+        border: 0;
+        border-radius: 8px;
+        padding: 8px 12px;
+        background: var(--strong);
+        color: #fff;
+        cursor: pointer;
+        font-weight: 700;
+      }
+
+      button:hover { background: #104e52; }
+      button:disabled {
+        background: #a8b4b6;
+        cursor: not-allowed;
+      }
+
+      input {
+        min-height: 40px;
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px 11px;
+        background: #fff;
+        color: var(--text);
+      }
+
+      h1, h2, h3, p { margin: 0; }
+      h1 { font-size: clamp(28px, 4vw, 42px); letter-spacing: 0; }
+      h2 { font-size: 21px; letter-spacing: 0; }
+      h3 { font-size: 15px; letter-spacing: 0; }
+      p { color: var(--muted); line-height: 1.45; }
+
+      .shell {
+        display: grid;
+        grid-template-columns: 250px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+
+      .side {
+        border-right: 1px solid var(--line);
+        background: #fbfdfc;
+        padding: 22px 16px;
+        position: sticky;
+        top: 0;
+        height: 100vh;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 24px;
+      }
+
+      .mark {
+        display: grid;
+        place-items: center;
+        width: 42px;
+        height: 42px;
+        border-radius: 8px;
+        background: var(--strong);
+        color: white;
+        font-weight: 900;
+      }
+
+      .brand strong { display: block; font-size: 18px; }
+      .brand span { color: var(--muted); font-size: 13px; }
+
+      .nav {
+        display: grid;
+        gap: 6px;
+      }
+
+      .nav button {
+        display: flex;
+        justify-content: flex-start;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        background: transparent;
+        color: var(--text);
+        font-weight: 700;
+      }
+
+      .nav button:hover,
+      .nav button.active {
+        background: #e3eeee;
+        color: var(--strong);
+      }
+
+      .content {
+        min-width: 0;
+        padding: 26px;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 20px;
+        align-items: center;
+        margin-bottom: 18px;
+      }
+
+      .hero p {
+        max-width: 780px;
+        margin-top: 8px;
+      }
+
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 34px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: #fff;
+        padding: 6px 12px;
+        color: var(--muted);
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #94a3a7;
+      }
+
+      .dot.good { background: var(--good); }
+      .dot.warn { background: #d97706; }
+      .dot.bad { background: var(--bad); }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .panel {
+        grid-column: span 12;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: var(--shadow);
+        padding: 18px;
+      }
+
+      .half { grid-column: span 6; }
+      .third { grid-column: span 4; }
+
+      .panel-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 14px;
+        margin-bottom: 14px;
+      }
+
+      .subtle {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .secondary {
+        background: #e6eeee;
+        color: var(--strong);
+      }
+
+      .secondary:hover { background: #d8e6e6; }
+      .danger {
+        background: #fee2e2;
+        color: var(--bad);
+      }
+
+      .danger:hover { background: #fecaca; }
+
+      .form-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(140px, 220px) auto;
+        gap: 10px;
+        align-items: end;
+      }
+
+      .field label {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .tiles {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .tile,
+      .item {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-soft);
+        padding: 12px;
+      }
+
+      .tile strong {
+        display: block;
+        font-size: 22px;
+        margin-top: 4px;
+      }
+
+      .list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .item {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .item p { margin-top: 4px; }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        min-height: 26px;
+        border-radius: 999px;
+        padding: 4px 9px;
+        background: #e6eeee;
+        color: var(--strong);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .badge.good {
+        background: #dcfce7;
+        color: var(--good);
+      }
+
+      .badge.warn {
+        background: #ffedd5;
+        color: var(--warn);
+      }
+
+      .badge.bad {
+        background: #fee2e2;
+        color: var(--bad);
+      }
+
+      .table-wrap { overflow-x: auto; }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 680px;
+      }
+
+      th, td {
+        padding: 10px 8px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: middle;
+      }
+
+      th {
+        color: var(--muted);
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0;
+      }
+
+      td .actions { justify-content: flex-end; }
+
+      .message {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+        padding: 12px;
+        color: var(--muted);
+      }
+
+      .hidden { display: none !important; }
+
+      .log {
+        max-height: 190px;
+        overflow: auto;
+        white-space: pre-wrap;
+        border-radius: 8px;
+        background: #102022;
+        color: #d8f7f1;
+        padding: 12px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12px;
+      }
+
+      @media (max-width: 920px) {
+        .shell { grid-template-columns: 1fr; }
+        .side {
+          position: static;
+          height: auto;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+        .nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .hero { grid-template-columns: 1fr; }
+        .half, .third { grid-column: span 12; }
+        .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .form-row { grid-template-columns: 1fr; }
+      }
+
+      @media (max-width: 560px) {
+        .content { padding: 18px 14px; }
+        .side { padding: 18px 14px; }
+        .nav { grid-template-columns: 1fr; }
+        .tiles { grid-template-columns: 1fr; }
+        .item { grid-template-columns: 1fr; }
+        .item .actions { justify-content: flex-start; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="side">
+        <div class="brand">
+          <div class="mark">V</div>
+          <div>
+            <strong>Camo NAS Server</strong>
+            <span>Simple control screen</span>
+          </div>
+        </div>
+        <nav class="nav" aria-label="Server sections">
+          <button class="active" data-view="home" type="button">Home</button>
+          <button data-view="pair" type="button">Pair or Login</button>
+          <button data-view="vms" type="button">Virtual Computers</button>
+          <button data-view="storage" type="button">NAS &amp; Storage</button>
+          <button data-view="apps" type="button">Apps</button>
+          <button data-view="remote" type="button">Remote Access</button>
+          <button data-view="updates" type="button">Updates</button>
+        </nav>
+      </aside>
+
+      <main class="content">
+        <header class="hero">
+          <div>
+            <h1>Control this server</h1>
+            <p id="heroText">Pair this browser once, then manage virtual computers, storage, apps, remote access, and updates from one clean screen.</p>
+          </div>
+          <div class="status-pill"><span id="statusDot" class="dot"></span><span id="statusText">Checking server...</span></div>
+        </header>
+
+        <section id="view-home" class="view">
+          <div class="grid">
+            <div class="panel">
+              <div class="panel-head">
+                <div>
+                  <h2>Server Overview</h2>
+                  <p>Camo NAS will only show setup tools after this browser is paired.</p>
+                </div>
+                <div class="actions">
+                  <button id="refreshAll" type="button">Refresh</button>
+                </div>
+              </div>
+              <div id="overviewTiles" class="tiles"></div>
+            </div>
+
+            <div class="panel half">
+              <div class="panel-head">
+                <div>
+                  <h2>What This Server Can Run</h2>
+                  <p>Based on detected hardware and the last benchmark.</p>
+                </div>
+              </div>
+              <div id="compatibilityList" class="list"></div>
+            </div>
+
+            <div class="panel half">
+              <div class="panel-head">
+                <div>
+                  <h2>Quick Actions</h2>
+                  <p>Common tasks for first setup and daily use.</p>
+                </div>
+              </div>
+              <div class="list">
+                <div class="item">
+                  <div>
+                    <h3>Pair another device</h3>
+                    <p>Make a new code for a phone, tablet, or another computer.</p>
+                  </div>
+                  <button class="secondary" data-go="pair" type="button">Open</button>
+                </div>
+                <div class="item">
+                  <div>
+                    <h3>Start or stop a virtual computer</h3>
+                    <p>Use Live to open its screen from this browser.</p>
+                  </div>
+                  <button class="secondary" data-go="vms" type="button">Open</button>
+                </div>
+                <div class="item">
+                  <div>
+                    <h3>Install Plex, Jellyfin, Docker, or VPN</h3>
+                    <p>Apps install on the server, not on this browser.</p>
+                  </div>
+                  <button class="secondary" data-go="apps" type="button">Open</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-pair" class="view hidden">
+          <div class="grid">
+            <div class="panel">
+              <div class="panel-head">
+                <div>
+                  <h2>Pair or Login</h2>
+                  <p>Use the code shown by the server installer, or create a new code after one device is already paired.</p>
+                </div>
+                <span id="pairBadge" class="badge">Not paired</span>
+              </div>
+              <div class="form-row">
+                <div class="field">
+                  <label for="deviceName">Device name</label>
+                  <input id="deviceName" autocomplete="name" value="Server Browser">
+                </div>
+                <div class="field">
+                  <label for="pairPin">Pairing code</label>
+                  <input id="pairPin" inputmode="numeric" autocomplete="one-time-code" placeholder="6 digit code">
+                </div>
+                <button id="pairButton" type="button">Pair This Browser</button>
+              </div>
+              <p id="pairMessage" class="message" style="margin-top: 12px;">Checking pairing status...</p>
+              <div class="actions" style="margin-top: 12px;">
+                <button id="newPinButton" class="secondary" type="button">Make New Code</button>
+                <button id="forgetButton" class="danger" type="button">Forget This Browser</button>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-head">
+                <div>
+                  <h2>Paired Devices</h2>
+                  <p>Devices listed here can control this server.</p>
+                </div>
+              </div>
+              <div id="pairedDevices" class="list"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-vms" class="view hidden">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>Virtual Computers</h2>
+                <p>Start one when you need it, stop it when you want the resources back.</p>
+              </div>
+              <button id="refreshVms" class="secondary" type="button">Refresh</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Name</th><th>Status</th><th>CPU</th><th>Memory</th><th>Controls</th></tr>
+                </thead>
+                <tbody id="vmRows"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-storage" class="view hidden">
+          <div class="grid">
+            <div class="panel half">
+              <div class="panel-head">
+                <div>
+                  <h2>Server Drives</h2>
+                  <p>Internal drives, USB flash drives, and attached hard drives detected by the server.</p>
+                </div>
+              </div>
+              <div id="diskList" class="list"></div>
+            </div>
+            <div class="panel half">
+              <div class="panel-head">
+                <div>
+                  <h2>USB &amp; Import Sources</h2>
+                  <p>Use these for bringing files, ISOs, and media onto the NAS.</p>
+                </div>
+              </div>
+              <div id="ingestList" class="list"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-apps" class="view hidden">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>Apps</h2>
+                <p>Plex, Jellyfin, Docker, VPN, NAS tools, and other server add-ons live here.</p>
+              </div>
+              <button id="refreshApps" class="secondary" type="button">Refresh</button>
+            </div>
+            <div id="moduleList" class="list"></div>
+          </div>
+        </section>
+
+        <section id="view-remote" class="view hidden">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>Remote Access</h2>
+                <p>Turn on secure access for when you are away from home.</p>
+              </div>
+              <span id="remoteBadge" class="badge">Checking</span>
+            </div>
+            <div id="remoteDetails" class="message">Checking remote access...</div>
+            <div class="actions" style="margin-top: 12px;">
+              <button id="enableRemote" type="button">Turn On Remote Access</button>
+              <button id="disableRemote" class="danger" type="button">Turn Off</button>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-updates" class="view hidden">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>Server Updates</h2>
+                <p>Update the server software remotely after pairing.</p>
+              </div>
+              <button id="runUpdate" type="button">Run Update</button>
+            </div>
+            <div id="updateDetails" class="message">Checking update status...</div>
+            <pre id="updateLog" class="log hidden"></pre>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      const state = {
+        token: localStorage.getItem("camonasToken") || "",
+        paired: false,
+        connected: false,
+        resources: null,
+        vms: [],
+        modules: [],
+        remote: null,
+        updates: null,
+      };
+
+      const $ = (selector) => document.querySelector(selector);
+      const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+
+      function esc(value) {
+        return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;",
+        }[char]));
+      }
+
+      function formatGb(value) {
+        const number = Number(value || 0);
+        if (!Number.isFinite(number)) return "0 GB";
+        return `${number >= 10 ? Math.round(number) : number.toFixed(1)} GB`;
+      }
+
+      function formatMb(value) {
+        const number = Number(value || 0);
+        if (!Number.isFinite(number) || number <= 0) return "-";
+        return number >= 1024 ? formatGb(number / 1024) : `${Math.round(number)} MB`;
+      }
+
+      function setStatus(kind, text) {
+        $("#statusDot").className = `dot ${kind || ""}`;
+        $("#statusText").textContent = text;
+      }
+
+      function authHeaders(extra = {}) {
+        return state.token ? { ...extra, Authorization: `Bearer ${state.token}` } : extra;
+      }
+
+      async function api(path, options = {}) {
+        const response = await fetch(path, {
+          ...options,
+          headers: authHeaders({
+            ...(options.body ? { "Content-Type": "application/json" } : {}),
+            ...(options.headers || {}),
+          }),
+        });
+        if (!response.ok) {
+          let detail = "";
+          try {
+            const body = await response.json();
+            detail = body.detail || JSON.stringify(body);
+          } catch {
+            detail = await response.text();
+          }
+          throw new Error(detail || `Request failed with ${response.status}`);
+        }
+        if (response.status === 204) return {};
+        return response.json();
+      }
+
+      async function safeLoad(fn, fallback) {
+        try {
+          return await fn();
+        } catch (error) {
+          if (fallback) fallback(error);
+          return null;
+        }
+      }
+
+      function requirePairMessage(target, noun) {
+        target.innerHTML = `<div class="message">Pair this browser before ${esc(noun)}.</div>`;
+      }
+
+      function renderOverview() {
+        const resources = state.resources;
+        const runningVms = state.vms.filter((vm) => String(vm.status).toLowerCase() === "running").length;
+        const installedApps = state.modules.filter((mod) => mod.install_state === "installed").length;
+        const remoteText = state.remote?.running ? "On" : "Off";
+        $("#overviewTiles").innerHTML = `
+          <div class="tile"><span class="subtle">Processor</span><strong>${resources ? esc(resources.cpu_logical) : "-"}</strong><span class="subtle">threads detected</span></div>
+          <div class="tile"><span class="subtle">Memory</span><strong>${resources ? formatGb(resources.memory_total_gb) : "-"}</strong><span class="subtle">${resources ? formatGb(resources.memory_available_gb) : "-"} available</span></div>
+          <div class="tile"><span class="subtle">Virtual Computers</span><strong>${state.vms.length}</strong><span class="subtle">${runningVms} running</span></div>
+          <div class="tile"><span class="subtle">Apps</span><strong>${installedApps}</strong><span class="subtle">installed</span></div>
+          <div class="tile"><span class="subtle">Remote Access</span><strong>${remoteText}</strong><span class="subtle">${esc(state.remote?.provider || "VPN")}</span></div>
+          <div class="tile"><span class="subtle">Graphics</span><strong>${resources?.gpu_summary?.length || 0}</strong><span class="subtle">device(s)</span></div>
+          <div class="tile"><span class="subtle">Updates</span><strong>${esc(state.updates?.status || "Idle")}</strong><span class="subtle">${state.updates?.running ? "running now" : "ready"}</span></div>
+          <div class="tile"><span class="subtle">Server</span><strong>${state.paired ? "Paired" : "Locked"}</strong><span class="subtle">browser access</span></div>
+        `;
+      }
+
+      async function renderCompatibility() {
+        if (!state.paired) {
+          requirePairMessage($("#compatibilityList"), "viewing server recommendations");
+          return;
+        }
+        const data = await safeLoad(() => api("/host/compatibility"), (error) => {
+          $("#compatibilityList").innerHTML = `<div class="message">${esc(error.message)}</div>`;
+        });
+        if (!data) return;
+        const warnings = (data.warnings || []).map((warning) => `<div class="message">${esc(warning)}</div>`).join("");
+        $("#compatibilityList").innerHTML = `
+          <div class="message"><strong>${esc(data.host_summary)}</strong><br>${esc(data.live_mode_hint)}</div>
+          ${warnings}
+          ${(data.workloads || []).slice(0, 5).map((workload) => `
+            <div class="item">
+              <div>
+                <h3>${esc(workload.name)}</h3>
+                <p>${esc(workload.summary)}</p>
+              </div>
+              <span class="badge ${badgeClass(workload.status)}">${esc(workload.status)}</span>
+            </div>
+          `).join("")}
+        `;
+      }
+
+      function badgeClass(value) {
+        const text = String(value || "").toLowerCase();
+        if (text.includes("excellent") || text.includes("good") || text.includes("ready") || text.includes("installed") || text.includes("running")) return "good";
+        if (text.includes("limited") || text.includes("setup") || text.includes("available")) return "warn";
+        if (text.includes("failed") || text.includes("off") || text.includes("not")) return "bad";
+        return "";
+      }
+
+      async function loadPairing() {
+        const status = await safeLoad(() => api("/pairing/status"), () => null);
+        state.connected = Boolean(status);
+        state.paired = Boolean(state.token);
+        $("#pairBadge").className = `badge ${state.paired ? "good" : "warn"}`;
+        $("#pairBadge").textContent = state.paired ? "This browser is paired" : "Needs pairing";
+        if (!status) {
+          setStatus("bad", "Server not reachable");
+          $("#pairMessage").textContent = "This page loaded, but the pairing service did not answer. Try refreshing after the server finishes starting.";
+          return;
+        }
+        setStatus(state.paired ? "good" : "warn", state.paired ? "Paired and ready" : "Enter pairing code");
+        $("#heroText").textContent = state.paired
+          ? "This browser can control Camo NAS. Use the sections on the left for virtual computers, NAS storage, apps, remote access, and updates."
+          : `Enter the pairing code to unlock server controls. Current code hint: ${status.pin_hint}.`;
+        $("#pairMessage").textContent = state.paired
+          ? "This browser is paired. You can make a new code for another device or forget this browser."
+          : `Enter the server pairing code. The current code ${status.pin_hint}.`;
+      }
+
+      async function pairBrowser() {
+        const deviceName = $("#deviceName").value.trim() || "Server Browser";
+        const pin = $("#pairPin").value.trim();
+        if (!pin) {
+          $("#pairMessage").textContent = "Enter the pairing code shown by Camo NAS.";
+          return;
+        }
+        $("#pairButton").disabled = true;
+        try {
+          const result = await api("/pairing/pair", {
+            method: "POST",
+            body: JSON.stringify({ device_name: deviceName, pin }),
+          });
+          state.token = result.token;
+          localStorage.setItem("camonasToken", state.token);
+          $("#pairPin").value = "";
+          $("#pairMessage").textContent = "Paired. Server controls are unlocked on this browser.";
+          await refreshAll();
+          showView("home");
+        } catch (error) {
+          $("#pairMessage").textContent = error.message || "Pairing failed. Check the code and try again.";
+        } finally {
+          $("#pairButton").disabled = false;
+        }
+      }
+
+      async function makeNewPin() {
+        $("#newPinButton").disabled = true;
+        try {
+          const result = await api("/pairing/rotate", { method: "POST" });
+          $("#pairMessage").innerHTML = `New pairing code: <strong>${esc(result.pin)}</strong>`;
+        } catch (error) {
+          $("#pairMessage").textContent = `Could not make a new code: ${error.message}`;
+        } finally {
+          $("#newPinButton").disabled = false;
+        }
+      }
+
+      async function renderPairedDevices() {
+        const target = $("#pairedDevices");
+        if (!state.paired) {
+          requirePairMessage(target, "viewing paired devices");
+          return;
+        }
+        const devices = await safeLoad(() => api("/pairing/devices"), (error) => {
+          target.innerHTML = `<div class="message">${esc(error.message)}</div>`;
+        });
+        if (!devices) return;
+        target.innerHTML = devices.length ? devices.map((device) => `
+          <div class="item">
+            <div>
+              <h3>${esc(device.name)}</h3>
+              <p>Allowed to control Camo NAS.</p>
+            </div>
+            <button class="danger" data-revoke="${esc(device.id)}" type="button">Remove</button>
+          </div>
+        `).join("") : `<div class="message">No paired devices yet.</div>`;
+      }
+
+      async function loadResources() {
+        state.resources = await safeLoad(() => api("/host/resources"));
+      }
+
+      async function loadVms() {
+        const target = $("#vmRows");
+        if (!state.paired) {
+          target.innerHTML = `<tr><td colspan="5">Pair this browser before controlling virtual computers.</td></tr>`;
+          return;
+        }
+        const vms = await safeLoad(() => api("/vms"), (error) => {
+          target.innerHTML = `<tr><td colspan="5">${esc(error.message)}</td></tr>`;
+        });
+        if (!vms) return;
+        state.vms = vms;
+        target.innerHTML = vms.length ? vms.map((vm) => `
+          <tr>
+            <td><strong>${esc(vm.name)}</strong><br><span class="subtle">ID ${esc(vm.vmid)}</span></td>
+            <td><span class="badge ${badgeClass(vm.status)}">${esc(vm.status)}</span></td>
+            <td>${vm.cpu_vcpus ? esc(vm.cpu_vcpus) : "-"}</td>
+            <td>${formatMb(vm.memory_mb)}</td>
+            <td>
+              <div class="actions">
+                <button data-vm-action="start" data-vmid="${esc(vm.vmid)}" type="button">Start</button>
+                <button class="secondary" data-vm-action="shutdown" data-vmid="${esc(vm.vmid)}" type="button">Shutdown</button>
+                <button class="danger" data-vm-action="stop" data-vmid="${esc(vm.vmid)}" type="button">Stop</button>
+                <button class="secondary" data-vm-live="${esc(vm.vmid)}" type="button">Live</button>
+              </div>
+            </td>
+          </tr>
+        `).join("") : `<tr><td colspan="5">No virtual computers yet. Use the Mac client to make the first one.</td></tr>`;
+      }
+
+      async function vmAction(vmid, action) {
+        await api(`/vms/${vmid}/${action}`, { method: "POST" });
+        await loadVms();
+        renderOverview();
+      }
+
+      async function openVmLive(vmid) {
+        const links = await api(`/vms/${vmid}/access`);
+        if (links.console_url) {
+          window.open(links.console_url, "_blank", "noopener");
+        }
+      }
+
+      async function loadStorage() {
+        const diskTarget = $("#diskList");
+        const ingestTarget = $("#ingestList");
+        if (!state.paired) {
+          requirePairMessage(diskTarget, "viewing server drives");
+          requirePairMessage(ingestTarget, "viewing USB and import sources");
+          return;
+        }
+        const [disks, ingest] = await Promise.all([
+          safeLoad(() => api("/host/disks"), (error) => {
+            diskTarget.innerHTML = `<div class="message">${esc(error.message)}</div>`;
+          }),
+          safeLoad(() => api("/storage/ingest-sources"), (error) => {
+            ingestTarget.innerHTML = `<div class="message">${esc(error.message)}</div>`;
+          }),
+        ]);
+        if (disks) {
+          diskTarget.innerHTML = disks.length ? disks.map((disk) => `
+            <div class="item">
+              <div>
+                <h3>${esc(disk.model || disk.name)}</h3>
+                <p>${esc(disk.path)} - ${formatGb(disk.size_gb)} - ${esc(disk.drive_kind || disk.transport || "drive")}</p>
+                ${(disk.mountpoints || []).length ? `<p>Mounted: ${esc(disk.mountpoints.join(", "))}</p>` : ""}
+              </div>
+              <span class="badge ${disk.import_eligible ? "good" : disk.removable ? "warn" : ""}">${disk.import_eligible ? "Import source" : disk.removable ? "Needs mount" : "Server drive"}</span>
+            </div>
+          `).join("") : `<div class="message">No drives were reported yet.</div>`;
+        }
+        if (ingest) {
+          ingestTarget.innerHTML = ingest.length ? ingest.map((source) => `
+            <div class="item">
+              <div>
+                <h3>${esc(source.name)}</h3>
+                <p>${esc(source.status || source.path)} - ${formatGb(source.size_gb)} - ${esc(source.source_type || source.transport || "drive")} - ${esc(source.filesystem || "unknown filesystem")}</p>
+                ${source.mountpoint ? `<p>Mounted at ${esc(source.mountpoint)}</p>` : ""}
+                ${source.recommended_action ? `<p>${esc(source.recommended_action)}</p>` : ""}
+              </div>
+              <span class="badge ${source.ready ? "good" : "warn"}">${source.ready ? "Ready" : "Needs setup"}</span>
+            </div>
+          `).join("") : `<div class="message">Plug in a USB flash drive or hard drive and refresh.</div>`;
+        }
+      }
+
+      async function loadModules() {
+        const target = $("#moduleList");
+        if (!state.paired) {
+          requirePairMessage(target, "opening the app store");
+          return;
+        }
+        const modules = await safeLoad(() => api("/store/modules"), (error) => {
+          target.innerHTML = `<div class="message">${esc(error.message)}</div>`;
+        });
+        if (!modules) return;
+        state.modules = modules;
+        target.innerHTML = modules.length ? modules.map((mod) => `
+          <div class="item">
+            <div>
+              <h3>${esc(mod.name)}</h3>
+              <p>${esc(mod.summary)} - ${esc(mod.category)} - ${esc(mod.size_mb)} MB</p>
+            </div>
+            <div class="actions">
+              <span class="badge ${badgeClass(mod.install_state)}">${esc(mod.install_state)}${mod.progress ? ` ${esc(mod.progress)}%` : ""}</span>
+              <button data-module="${esc(mod.id)}" ${mod.install_state === "installed" ? "disabled" : ""} type="button">${mod.install_state === "installed" ? "Installed" : "Download"}</button>
+            </div>
+          </div>
+        `).join("") : `<div class="message">No apps were listed yet.</div>`;
+      }
+
+      async function installModule(moduleId) {
+        await api(`/store/modules/${moduleId}/install`, { method: "POST" });
+        await loadModules();
+        renderOverview();
+      }
+
+      async function loadRemote() {
+        if (!state.paired) {
+          $("#remoteDetails").textContent = "Pair this browser before changing remote access.";
+          $("#remoteBadge").className = "badge warn";
+          $("#remoteBadge").textContent = "Locked";
+          return;
+        }
+        const remote = await safeLoad(() => api("/remote/status"), (error) => {
+          $("#remoteDetails").textContent = error.message;
+        });
+        if (!remote) return;
+        state.remote = remote;
+        $("#remoteBadge").className = `badge ${remote.running ? "good" : "warn"}`;
+        $("#remoteBadge").textContent = remote.running ? "On" : "Off";
+        $("#remoteDetails").innerHTML = `
+          <strong>${esc(remote.provider || "Remote access")}</strong><br>
+          ${esc(remote.message || (remote.running ? "Remote access is running." : "Remote access is off."))}
+          ${remote.remote_ip ? `<br>Remote address: ${esc(remote.remote_ip)}` : ""}
+          ${remote.admin_url ? `<br>Admin page: ${esc(remote.admin_url)}` : ""}
+        `;
+      }
+
+      async function setRemote(enabled) {
+        await api(enabled ? "/remote/enable" : "/remote/disable", { method: "POST" });
+        await loadRemote();
+        renderOverview();
+      }
+
+      async function loadUpdates() {
+        if (!state.paired) {
+          $("#updateDetails").textContent = "Pair this browser before running server updates.";
+          $("#updateLog").classList.add("hidden");
+          return;
+        }
+        const updates = await safeLoad(() => api("/system/update/status"), (error) => {
+          $("#updateDetails").textContent = error.message;
+        });
+        if (!updates) return;
+        state.updates = updates;
+        $("#updateDetails").innerHTML = `<strong>${esc(updates.status)}</strong><br>${esc(updates.message || "Ready.")}`;
+        if (updates.log_tail && updates.log_tail.length) {
+          $("#updateLog").classList.remove("hidden");
+          $("#updateLog").textContent = updates.log_tail.join("\n");
+        } else {
+          $("#updateLog").classList.add("hidden");
+        }
+      }
+
+      async function runUpdate() {
+        $("#runUpdate").disabled = true;
+        try {
+          await api("/system/update/run", { method: "POST" });
+          await loadUpdates();
+        } finally {
+          $("#runUpdate").disabled = false;
+        }
+      }
+
+      function showView(name) {
+        $$(".view").forEach((view) => view.classList.toggle("hidden", view.id !== `view-${name}`));
+        $$(".nav button").forEach((button) => button.classList.toggle("active", button.dataset.view === name));
+      }
+
+      async function refreshAll() {
+        await loadPairing();
+        if (state.paired) {
+          await Promise.all([
+            loadResources(),
+            loadVms(),
+            loadStorage(),
+            loadModules(),
+            loadRemote(),
+            loadUpdates(),
+            renderPairedDevices(),
+          ]);
+        } else {
+          state.resources = null;
+          state.vms = [];
+          state.modules = [];
+          state.remote = null;
+          state.updates = null;
+          await Promise.all([loadVms(), loadStorage(), loadModules(), loadRemote(), loadUpdates(), renderPairedDevices()]);
+        }
+        renderOverview();
+        await renderCompatibility();
+      }
+
+      document.addEventListener("click", async (event) => {
+        const button = event.target.closest("button");
+        if (!button) return;
+        if (button.dataset.view) showView(button.dataset.view);
+        if (button.dataset.go) showView(button.dataset.go);
+        if (button.id === "refreshAll") await refreshAll();
+        if (button.id === "refreshVms") await loadVms();
+        if (button.id === "refreshApps") await loadModules();
+        if (button.id === "pairButton") await pairBrowser();
+        if (button.id === "newPinButton") await makeNewPin();
+        if (button.id === "forgetButton") {
+          localStorage.removeItem("camonasToken");
+          state.token = "";
+          await refreshAll();
+        }
+        if (button.id === "enableRemote") await setRemote(true);
+        if (button.id === "disableRemote") await setRemote(false);
+        if (button.id === "runUpdate") await runUpdate();
+        if (button.dataset.vmAction) await vmAction(button.dataset.vmid, button.dataset.vmAction);
+        if (button.dataset.vmLive) await openVmLive(button.dataset.vmLive);
+        if (button.dataset.module) await installModule(button.dataset.module);
+        if (button.dataset.revoke) {
+          await api(`/pairing/devices/${button.dataset.revoke}`, { method: "DELETE" });
+          await renderPairedDevices();
+        }
+      });
+
+      refreshAll();
+    </script>
+  </body>
+</html>

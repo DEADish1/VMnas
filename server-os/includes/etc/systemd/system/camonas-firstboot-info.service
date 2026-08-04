@@ -1,0 +1,11 @@
+[Unit]
+Description=Write Camo NAS first boot access information
+After=network-online.target camonas-agent.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/camonas-firstboot-info
+
+[Install]
+WantedBy=multi-user.target

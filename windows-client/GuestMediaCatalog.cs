@@ -1,4 +1,4 @@
-namespace VMnasAdmin.Windows;
+namespace CamoNASAdmin.Windows;
 
 public sealed record GuestMediaCatalogItem(string Name, string FileName, string DownloadPage, string? DirectUrl = null, string? Sha256 = null)
 {

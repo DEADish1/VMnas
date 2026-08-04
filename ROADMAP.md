@@ -1,4 +1,4 @@
-# VMnas Roadmap
+# Camo NAS Roadmap
 
 This checklist tracks the path from the current prototype foundation to a usable `1.0` release.
 
@@ -10,7 +10,7 @@ Version numbering starts at `0.5` because the project already has a server OS sc
 - [x] Choose Proxmox/Debian as the server base
 - [x] Add custom ISO build scaffold
 - [x] Add server install script for Proxmox setup
-- [x] Add VMnas server agent scaffold
+- [x] Add Camo NAS server agent scaffold
 - [x] Add host resource detection endpoint
 - [x] Add live system compatibility test endpoint
 - [x] Add server benchmark endpoint and first-boot benchmark service
@@ -51,8 +51,8 @@ Version numbering starts at `0.5` because the project already has a server OS sc
 - [x] Add Windows removable-drive safety checks and erase confirmation
 - [x] Add Windows multi-ISO guest media library support
 - [ ] Add Windows managed guest-media download catalog with checksum verification
-- [x] Add a visible `VMnas` USB data-partition label
-- [x] Ensure VMnas server agent starts after reboot
+- [x] Add a visible `CAMONAS` USB data-partition label
+- [x] Ensure Camo NAS server agent starts after reboot
 - [ ] Ensure Proxmox web UI is reachable after reboot
 - [x] Generate pairing PIN automatically after install
 - [x] Show server IP address and pairing code on first boot
@@ -120,9 +120,9 @@ Version numbering starts at `0.5` because the project already has a server OS sc
 - [x] Add browser client shell
 - [x] Define iPhone client API contract
 - [x] Define Android client API contract
-- [x] Add HTTPS setup for VMnas agent
+- [x] Add HTTPS setup for Camo NAS agent
 - [x] Add first-run password/admin hardening
-- [x] Add firewall rules for VMnas services
+- [x] Add firewall rules for Camo NAS services
 
 ## 1.0 - First Usable Release
 

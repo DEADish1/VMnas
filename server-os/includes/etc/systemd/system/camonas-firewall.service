@@ -1,0 +1,12 @@
+[Unit]
+Description=Apply Camo NAS firewall defaults
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/camonas-apply-firewall
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

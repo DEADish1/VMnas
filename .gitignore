@@ -1,12 +1,12 @@
 .DS_Store
 dist/*
 !dist/
-!dist/vmnas-server-trixie-amd64.iso.sha256
+!dist/camonas-server-trixie-amd64.iso.sha256
 !dist/iso-parts/
 !dist/iso-parts/**
 *.iso
 *.sha256
-!dist/vmnas-server-trixie-amd64.iso.sha256
+!dist/camonas-server-trixie-amd64.iso.sha256
 __pycache__/
 *.pyc
 .venv/

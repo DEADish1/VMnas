@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+CERT_DIR="${CAMONAS_CERT_DIR:-/var/lib/camonas/certs}"
+HOSTNAME_VALUE="$(hostname -f 2>/dev/null || hostname)"
+IP_ADDR="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
+
+install -d -m 0700 "${CERT_DIR}"
+
+if [[ -f "${CERT_DIR}/camonas.crt" && -f "${CERT_DIR}/camonas.key" ]]; then
+  exit 0
+fi
+
+SAN="DNS:${HOSTNAME_VALUE},DNS:camonas,DNS:camonas.local"
+if [[ -n "${IP_ADDR}" ]]; then
+  SAN="${SAN},IP:${IP_ADDR}"
+fi
+
+openssl req -x509 -nodes -newkey rsa:4096 \
+  -keyout "${CERT_DIR}/camonas.key" \
+  -out "${CERT_DIR}/camonas.crt" \
+  -sha256 \
+  -days 825 \
+  -subj "/CN=${HOSTNAME_VALUE}" \
+  -addext "subjectAltName=${SAN}"
+
+chmod 0600 "${CERT_DIR}/camonas.key"
+chmod 0644 "${CERT_DIR}/camonas.crt"

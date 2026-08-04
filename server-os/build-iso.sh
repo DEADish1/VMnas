@@ -3,9 +3,9 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT_DIR="${ROOT_DIR}/dist"
-IMAGE_TAG="${VMNAS_BUILDER_IMAGE:-vmnas-iso-builder:latest}"
-DIRECT="${VMNAS_DIRECT_LIVE_BUILD:-0}"
-BUILDER_PLATFORM="${VMNAS_BUILDER_PLATFORM:-linux/amd64}"
+IMAGE_TAG="${CAMONAS_BUILDER_IMAGE:-camonas-iso-builder:latest}"
+DIRECT="${CAMONAS_DIRECT_LIVE_BUILD:-0}"
+BUILDER_PLATFORM="${CAMONAS_BUILDER_PLATFORM:-linux/amd64}"
 DOCKER_BIN="${DOCKER_BIN:-}"
 
 if [[ -z "${DOCKER_BIN}" ]]; then
@@ -29,7 +29,7 @@ fi
 
 if [[ -z "${DOCKER_BIN}" || ! -x "${DOCKER_BIN}" ]]; then
   cat >&2 <<EOF
-Docker was not found, so VMnas cannot build the server ISO on this Mac yet.
+Docker was not found, so Camo NAS cannot build the server ISO on this Mac yet.
 
 Install and start Docker Desktop, then run:
   cd "${ROOT_DIR}"
@@ -37,7 +37,7 @@ Install and start Docker Desktop, then run:
 
 Or build directly on a Debian host with:
   cd "${ROOT_DIR}"
-  VMNAS_DIRECT_LIVE_BUILD=1 ./server-os/build-iso.sh
+  CAMONAS_DIRECT_LIVE_BUILD=1 ./server-os/build-iso.sh
 EOF
   exit 1
 fi

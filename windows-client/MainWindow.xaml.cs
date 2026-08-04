@@ -10,7 +10,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 
-namespace VMnasAdmin.Windows;
+namespace CamoNASAdmin.Windows;
 
 public partial class MainWindow : Window
 {
@@ -24,7 +24,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         ApplyRandomCamouflage();
         _projectRoot = FindProjectRoot(AppContext.BaseDirectory);
-        IsoPathTextBox.Text = Path.Combine(_projectRoot, "dist", "vmnas-server-trixie-amd64.iso");
+        IsoPathTextBox.Text = Path.Combine(_projectRoot, "dist", "camonas-server-trixie-amd64.iso");
         GuestMediaListBox.ItemsSource = _guestMedia;
         CatalogComboBox.ItemsSource = GuestMediaCatalog.Items;
         CatalogComboBox.SelectedIndex = 0;
@@ -150,7 +150,7 @@ public partial class MainWindow : Window
     {
         if (CatalogComboBox.SelectedItem is not GuestMediaCatalogItem item || item.DirectUrl is null || item.Sha256 is null) { OpenCatalogPage_Click(sender, e); return; }
         try {
-            var directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "VMnas");
+            var directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "CamoNAS");
             Directory.CreateDirectory(directory);
             var destination = Path.Combine(directory, item.FileName);
             PairingStatusTextBlock.Text = $"Downloading {item.Name}...";
@@ -169,7 +169,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            PairingStatusTextBlock.Text = "Pairing with VMnas server...";
+            PairingStatusTextBlock.Text = "Pairing with Camo NAS server...";
             await _serverPairing.PairAsync(ServerUrlTextBox.Text, DeviceNameTextBox.Text, PairingPinBox.Password);
             PairingPinBox.Clear();
             PairingStatusTextBlock.Text = "Paired securely. The device token is stored in Windows Credential Manager.";
@@ -193,7 +193,7 @@ public partial class MainWindow : Window
     private async Task RefreshVmsAsync()
     {
         VmListBox.ItemsSource = await _serverPairing.VmsAsync(ServerUrlTextBox.Text);
-        PairingStatusTextBlock.Text = "Connected to VMnas server.";
+        PairingStatusTextBlock.Text = "Connected to Camo NAS server.";
     }
 
     private async void DeleteVm_Click(object sender, RoutedEventArgs e)
@@ -211,8 +211,8 @@ public partial class MainWindow : Window
         {
             var output = await RunAsync("wsl.exe", $"--cd \"{ToWslPath(_projectRoot)}\" -- bash server-os/build-iso.sh");
             AppendLog(output);
-            var isoPath = Path.Combine(_projectRoot, "dist", "vmnas-server-trixie-amd64.iso");
-            if (!File.Exists(isoPath)) throw new InvalidOperationException("The ISO build finished without creating dist\\vmnas-server-trixie-amd64.iso.");
+            var isoPath = Path.Combine(_projectRoot, "dist", "camonas-server-trixie-amd64.iso");
+            if (!File.Exists(isoPath)) throw new InvalidOperationException("The ISO build finished without creating dist\\camonas-server-trixie-amd64.iso.");
             IsoPathTextBox.Text = isoPath;
             StatusTextBlock.Text = "Server ISO built successfully.";
         }
@@ -224,12 +224,12 @@ public partial class MainWindow : Window
     {
         if (DiskComboBox.SelectedItem is not UsbDisk disk)
         {
-            MessageBox.Show(this, "Choose an existing VMnas server ISO and a removable USB drive first.", "VMnas Admin", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(this, "Choose an existing Camo NAS server ISO and a removable USB drive first.", "Camo NAS Admin", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
         if (!File.Exists(IsoPathTextBox.Text))
         {
-            MessageBox.Show(this, "Choose an existing VMnas server ISO and a removable USB drive first.", "VMnas Admin", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(this, "Choose an existing Camo NAS server ISO and a removable USB drive first.", "Camo NAS Admin", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
         SetBusy(true, $"Writing {disk.DisplayName}. Windows will request administrator permission...");

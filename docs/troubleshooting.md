@@ -1,4 +1,4 @@
-# VMnas Troubleshooting
+# Camo NAS Troubleshooting
 
 ## Mac Client Cannot Connect
 
@@ -8,7 +8,7 @@ Check:
 - Mac is on the same network or connected through remote access.
 - URL starts with `https://`.
 - Port is `8765`.
-- Firewall allows VMnas API.
+- Firewall allows Camo NAS API.
 
 Try:
 
@@ -27,13 +27,13 @@ Check:
 On the server:
 
 ```bash
-sudo vmnas-pairing-code
+sudo camonas-pairing-code
 ```
 
 Rotate PIN:
 
 ```bash
-sudo vmnas-pairing-code --rotate
+sudo camonas-pairing-code --rotate
 ```
 
 ## VM Will Not Start
@@ -55,7 +55,7 @@ Check BIOS:
 - IOMMU enabled
 - Above 4G Decoding enabled
 
-Check VMnas GPU page:
+Check Camo NAS GPU page:
 
 - IOMMU group present
 - NVIDIA GPU detected
@@ -68,7 +68,7 @@ Check:
 - Tailscale module installed.
 - Server is authenticated to Tailscale.
 - Client device is on the same Tailnet.
-- Remote IP appears in VMnas Network page.
+- Remote IP appears in Camo NAS Network page.
 
 ## Store Module Fails
 

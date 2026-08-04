@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta http-equiv="Cache-Control" content="no-store">
-    <title>VMnas Installer</title>
+    <title>Camo NAS Installer</title>
     <link rel="stylesheet" href="/styles.css?v=0.5.4">
   </head>
   <body>
@@ -13,7 +13,7 @@
         <div class="brand">
           <div class="mark">V</div>
           <div>
-            <h1>VMnas</h1>
+            <h1>Camo NAS</h1>
             <p>Server setup</p>
           </div>
         </div>
@@ -28,7 +28,7 @@
       <section class="content">
         <header class="topbar">
           <div>
-            <p class="eyebrow">VMnas easy installer v0.5.4</p>
+            <p class="eyebrow">Camo NAS easy installer v0.5.4</p>
             <h2 id="step-title">Start</h2>
           </div>
           <div id="status-pill" class="pill">Ready</div>
@@ -36,8 +36,8 @@
 
         <section class="step active" id="welcome">
           <div class="hero">
-            <h3>Install VMnas Server</h3>
-            <p>VMnas will check this computer, choose safe defaults, install the server stack, set up networking, and show a pairing code when it is ready.</p>
+            <h3>Install Camo NAS Server</h3>
+            <p>Camo NAS will check this computer, choose safe defaults, install the server stack, set up networking, and show a pairing code when it is ready.</p>
           </div>
           <div class="grid three">
             <article class="card">
@@ -69,7 +69,7 @@
             <article class="card">
               <h4>Confirm</h4>
               <p class="warning">Only the selected server drive will be repartitioned. Existing data on that selected drive will be erased; other drives are left untouched.</p>
-              <p>VMnas creates the boot partition, the VMnas server partition, and a ready VMNAS-DATA partition automatically.</p>
+              <p>Camo NAS creates the boot partition, the Camo NAS server partition, and a ready CAMONAS-DATA partition automatically.</p>
               <label class="check confirm-check"><input id="erase-toggle" type="checkbox"> I understand the selected drive will be erased</label>
               <input id="erase-confirmation" class="hidden" value="">
               <p id="selected-disk-summary" class="muted">No disk selected.</p>
@@ -82,9 +82,9 @@
             <article class="card form">
               <h4>Create Admin</h4>
               <label>Server name</label>
-              <input id="hostname" value="vmnas">
+              <input id="hostname" value="camonas">
               <label>Admin user</label>
-              <input id="admin-user" value="vmnas">
+              <input id="admin-user" value="camonas">
               <label>Admin password</label>
               <input id="admin-password" type="password" autocomplete="new-password">
               <label>Confirm password</label>
@@ -105,7 +105,7 @@
         <section class="step" id="install">
           <div class="card install-card">
             <h4>Ready to install</h4>
-            <p>VMnas will repartition the selected server drive only, install the server stack, create the LAN bridge automatically, and leave the remaining space on that drive ready as VMNAS-DATA.</p>
+            <p>Camo NAS will repartition the selected server drive only, install the server stack, create the LAN bridge automatically, and leave the remaining space on that drive ready as CAMONAS-DATA.</p>
             <p id="password-warning" class="warning hidden">Set and confirm the admin password before installing.</p>
             <div class="summary-grid">
               <div><span>Drive</span><strong id="review-drive">Choose a drive</strong></div>
@@ -149,7 +149,7 @@
               <span>Current phase</span>
               <strong id="install-phase">Ready</strong>
             </div>
-            <button id="install-button" class="primary">Install VMnas Server</button>
+            <button id="install-button" class="primary">Install Camo NAS Server</button>
             <button id="reboot-button" class="secondary" disabled>Reboot After Install</button>
             <div id="failure-help" class="failure-help hidden">
               <h5>Install needs attention</h5>
@@ -160,7 +160,7 @@
             <div class="pair-after">
               <h4>Pair after install</h4>
               <div id="pair-code" class="pair-code">------</div>
-              <img id="pair-qr" class="pair-qr hidden" alt="VMnas pairing QR code">
+              <img id="pair-qr" class="pair-qr hidden" alt="Camo NAS pairing QR code">
               <p id="pair-url" class="muted">Scan this code from the client after the server finishes installing.</p>
               <button id="rotate-pin" class="secondary">New PIN</button>
             </div>

@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+CONFIG=/etc/camonas/update.conf
+[[ -f "$CONFIG" ]] || exit 0
+source "$CONFIG"
+[[ -n "${CAMONAS_UPDATE_MANIFEST_URL:-}" && -n "${CAMONAS_UPDATE_PUBLIC_KEY:-}" ]] || exit 0
+work="$(mktemp -d)"; trap 'rm -rf "$work"' EXIT
+curl -fsSL "$CAMONAS_UPDATE_MANIFEST_URL" -o "$work/manifest.json"
+curl -fsSL "${CAMONAS_UPDATE_MANIFEST_URL}.asc" -o "$work/manifest.json.asc"
+gpgv --keyring "$CAMONAS_UPDATE_PUBLIC_KEY" "$work/manifest.json.asc" "$work/manifest.json"
+# Release tooling supplies a verified package URL and SHA-256 in the manifest.

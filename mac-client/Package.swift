@@ -2,14 +2,14 @@
 import PackageDescription
 
 let package = Package(
-    name: "VMnasAdmin",
+    name: "CamoNASAdmin",
     platforms: [
         .macOS(.v14)
     ],
     products: [
-        .executable(name: "VMnasAdmin", targets: ["VMnasAdmin"])
+        .executable(name: "CamoNASAdmin", targets: ["CamoNASAdmin"])
     ],
     targets: [
-        .executableTarget(name: "VMnasAdmin")
+        .executableTarget(name: "CamoNASAdmin")
     ]
 )

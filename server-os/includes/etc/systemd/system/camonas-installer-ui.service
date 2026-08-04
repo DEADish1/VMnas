@@ -1,0 +1,13 @@
+[Unit]
+Description=Camo NAS graphical installer UI
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/camonas/installer-api/camonas_installer_api.py
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

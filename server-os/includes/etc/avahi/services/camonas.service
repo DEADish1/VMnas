@@ -1,0 +1,16 @@
+<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<service-group>
+  <name replace-wildcards="yes">Camo NAS on %h</name>
+  <service>
+    <type>_https._tcp</type>
+    <port>8765</port>
+    <txt-record>path=/</txt-record>
+    <txt-record>product=CamoNAS</txt-record>
+  </service>
+  <service>
+    <type>_camonas._tcp</type>
+    <port>8765</port>
+    <txt-record>api=https</txt-record>
+  </service>
+</service-group>

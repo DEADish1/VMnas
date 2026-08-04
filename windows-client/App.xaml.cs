@@ -1,6 +1,6 @@
 using System.Windows;
 
-namespace VMnasAdmin.Windows;
+namespace CamoNASAdmin.Windows;
 
 public partial class App : Application
 {

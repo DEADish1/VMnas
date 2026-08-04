@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+STATE=/var/lib/camonas/update-status.json
+LOG=/var/log/camonas/update.log
+PID=/run/camonas-update.pid
+
+mkdir -p "$(dirname "$STATE")" "$(dirname "$LOG")"
+
+if [[ -f "$PID" ]] && kill -0 "$(cat "$PID")" 2>/dev/null; then
+  echo "Camo NAS update is already running with PID $(cat "$PID")." >> "$LOG"
+  exit 0
+fi
+
+echo "$$" > "$PID"
+trap 'rm -f "$PID"' EXIT
+
+json_state() {
+  local status="$1"
+  local running="$2"
+  local exit_code="$3"
+  local message="$4"
+  local started="${5:-}"
+  local finished="${6:-}"
+  python3 - "$STATE" "$status" "$running" "$exit_code" "$message" "$started" "$finished" <<'PY'
+import json
+import sys
+
+path, status, running, exit_code, message, started, finished = sys.argv[1:]
+payload = {
+    "status": status,
+    "running": running == "true",
+    "exit_code": int(exit_code),
+    "message": message,
+    "started_at": started,
+    "finished_at": finished,
+}
+with open(path, "w", encoding="utf-8") as handle:
+    json.dump(payload, handle, indent=2)
+PY
+}
+
+timestamp() {
+  date -u +"%Y-%m-%dT%H:%M:%SZ"
+}
+
+STARTED="$(timestamp)"
+json_state "running" "true" 0 "Server update is running." "$STARTED" ""
+
+{
+  echo "==== Camo NAS remote update started at $STARTED ===="
+  echo "Refreshing package lists..."
+  DEBIAN_FRONTEND=noninteractive apt-get update
+
+  echo "Installing available OS and security updates..."
+  DEBIAN_FRONTEND=noninteractive apt-get full-upgrade -y
+
+  echo "Running Camo NAS signed update check..."
+  if [[ -x /usr/local/sbin/camonas-update ]]; then
+    /usr/local/sbin/camonas-update || true
+  else
+    echo "camonas-update is not installed; skipping signed Camo NAS package check."
+  fi
+
+  echo "Removing unused packages..."
+  DEBIAN_FRONTEND=noninteractive apt-get autoremove -y
+
+  FINISHED="$(timestamp)"
+  echo "==== Camo NAS remote update completed at $FINISHED ===="
+  json_state "complete" "false" 0 "Server update completed successfully." "$STARTED" "$FINISHED"
+} >> "$LOG" 2>&1 || {
+  code=$?
+  FINISHED="$(timestamp)"
+  echo "==== Camo NAS remote update failed at $FINISHED with exit code $code ====" >> "$LOG"
+  json_state "failed" "false" "$code" "Server update failed. Open the update log for details." "$STARTED" "$FINISHED"
+  exit "$code"
+}

@@ -1,4 +1,4 @@
-# VMnas Mobile API Contract
+# Camo NAS Mobile API Contract
 
 This contract is shared by iPhone, Android, browser, and future clients.
 
@@ -7,7 +7,7 @@ This contract is shared by iPhone, Android, browser, and future clients.
 Local network:
 
 ```text
-https://vmnas.local:8765
+https://camonas.local:8765
 ```
 
 Remote access:
@@ -16,21 +16,21 @@ Remote access:
 https://TAILSCALE-IP:8765
 ```
 
-Clients should support self-signed VMnas certificates after the user has paired locally.
+Clients should support self-signed Camo NAS certificates after the user has paired locally.
 
 ## Pairing
 
 Pairing is done on the local network or from the server installer screen.
 
-VMnas pairing QR codes contain the same connection info a client needs to pair:
+Camo NAS pairing QR codes contain the same connection info a client needs to pair:
 
 ```json
 {
-  "type": "vmnas-pairing",
+  "type": "camonas-pairing",
   "version": 1,
-  "server_name": "VMnas Server",
-  "api_url": "https://vmnas.local:8765",
-  "urls": ["https://vmnas.local:8765", "https://192.168.1.40:8765"],
+  "server_name": "Camo NAS Server",
+  "api_url": "https://camonas.local:8765",
+  "urls": ["https://camonas.local:8765", "https://192.168.1.40:8765"],
   "pin": "123456",
   "pair_endpoint": "/pairing/pair",
   "status_endpoint": "/pairing/status",
@@ -75,7 +75,7 @@ Authorization: Bearer long-device-token
 Clients may also send:
 
 ```http
-X-VMnas-Token: long-device-token
+X-CamoNAS-Token: long-device-token
 ```
 
 ## Core Endpoints
@@ -121,12 +121,12 @@ POST /remote/disable
 
 ## Discovery
 
-VMnas advertises:
+Camo NAS advertises:
 
 - `_https._tcp` on port `8765`
-- `_vmnas._tcp` on port `8765`
+- `_camonas._tcp` on port `8765`
 
-Mobile clients should scan mDNS/Bonjour for `_vmnas._tcp`.
+Mobile clients should scan mDNS/Bonjour for `_camonas._tcp`.
 
 ## Remote Access
 

@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+STORE="${CAMONAS_PAIRING_STORE:-/var/lib/camonas/pairing.json}"
+
+if [[ "${1:-}" == "--rotate" ]]; then
+  curl -fsS -X POST http://127.0.0.1:8765/pairing/rotate
+  echo
+  exit 0
+fi
+
+if [[ ! -f "${STORE}" ]]; then
+  echo "Pairing store has not been created yet. Make sure camonas-agent is running." >&2
+  exit 1
+fi
+
+CAMONAS_PAIRING_STORE="${STORE}" python3 - <<'PY'
+import json
+import os
+from pathlib import Path
+
+store = Path(os.environ["CAMONAS_PAIRING_STORE"])
+data = json.loads(store.read_text(encoding="utf-8"))
+print(f"Camo NAS pairing PIN: {data['pin']}")
+print("Enter this PIN in the Mac/iPhone/Android client.")
+PY

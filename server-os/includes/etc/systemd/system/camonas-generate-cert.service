@@ -1,0 +1,10 @@
+[Unit]
+Description=Generate Camo NAS HTTPS certificate
+Before=camonas-agent.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/camonas-generate-cert
+
+[Install]
+WantedBy=multi-user.target
