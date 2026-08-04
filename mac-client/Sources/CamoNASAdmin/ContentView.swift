@@ -17,46 +17,100 @@ private enum CamoNASTheme {
 }
 
 private struct CamoNASPanelBackground: View {
+    private let seed: UInt64
+
+    init(seed: UInt64 = UInt64.random(in: 1...UInt64.max)) {
+        self.seed = seed
+    }
+
     var body: some View {
         ZStack {
             CamoNASTheme.panel
             GeometryReader { proxy in
                 let width = proxy.size.width
                 let height = proxy.size.height
-                Group {
+                let pieces = camoPieces(width: width, height: height)
+                ForEach(pieces) { piece in
                     Path { path in
-                        path.move(to: CGPoint(x: 0, y: height * 0.15))
-                        path.addLine(to: CGPoint(x: width * 0.16, y: 0))
-                        path.addLine(to: CGPoint(x: width * 0.36, y: 0))
-                        path.addLine(to: CGPoint(x: width * 0.24, y: height * 0.31))
-                        path.addLine(to: CGPoint(x: width * 0.38, y: height * 0.43))
-                        path.addLine(to: CGPoint(x: width * 0.18, y: height * 0.67))
-                        path.addLine(to: CGPoint(x: 0, y: height * 0.45))
+                        path.move(to: piece.points[0])
+                        for point in piece.points.dropFirst() {
+                            path.addLine(to: point)
+                        }
                         path.closeSubpath()
                     }
-                    .fill(CamoNASTheme.accentSoft.opacity(0.34))
-
-                    Path { path in
-                        path.move(to: CGPoint(x: width * 0.55, y: 0))
-                        path.addLine(to: CGPoint(x: width * 0.86, y: 0))
-                        path.addLine(to: CGPoint(x: width * 0.74, y: height * 0.25))
-                        path.addLine(to: CGPoint(x: width, y: height * 0.45))
-                        path.addLine(to: CGPoint(x: width * 0.76, y: height * 0.72))
-                        path.addLine(to: CGPoint(x: width * 0.55, y: height * 0.38))
-                        path.closeSubpath()
-                    }
-                    .fill(CamoNASTheme.accent.opacity(0.16))
-
-                    Path { path in
-                        path.move(to: CGPoint(x: width * 0.82, y: height))
-                        path.addLine(to: CGPoint(x: width, y: height * 0.76))
-                        path.addLine(to: CGPoint(x: width, y: height))
-                        path.closeSubpath()
-                    }
-                    .fill(CamoNASTheme.border.opacity(0.20))
+                    .fill(piece.color.opacity(piece.opacity))
                 }
             }
         }
+    }
+
+    private func camoPieces(width: CGFloat, height: CGFloat) -> [CamoPiece] {
+        var rng = SeededRandom(seed: seed)
+        let colors = [
+            CamoNASTheme.accentSoft,
+            CamoNASTheme.accent,
+            CamoNASTheme.border,
+            CamoNASTheme.panelRaised,
+            Color(red: 0.055, green: 0.055, blue: 0.055)
+        ]
+        let count = max(12, min(30, Int((width * height) / 11_000)))
+        return (0..<count).map { index in
+            let centerX = rng.nextCGFloat(in: -0.08...1.08) * width
+            let centerY = rng.nextCGFloat(in: -0.10...1.10) * height
+            let pieceWidth = rng.nextCGFloat(in: 0.11...0.24) * width
+            let pieceHeight = rng.nextCGFloat(in: 0.12...0.28) * height
+            let notch = rng.nextCGFloat(in: 0.18...0.42)
+            let points: [CGPoint]
+            if rng.nextBool() {
+                points = [
+                    CGPoint(x: centerX - pieceWidth * 0.50, y: centerY - pieceHeight * 0.22),
+                    CGPoint(x: centerX + pieceWidth * 0.12, y: centerY - pieceHeight * 0.50),
+                    CGPoint(x: centerX + pieceWidth * 0.50, y: centerY - pieceHeight * 0.10),
+                    CGPoint(x: centerX + pieceWidth * notch, y: centerY + pieceHeight * 0.12),
+                    CGPoint(x: centerX + pieceWidth * 0.28, y: centerY + pieceHeight * 0.50),
+                    CGPoint(x: centerX - pieceWidth * 0.34, y: centerY + pieceHeight * 0.32)
+                ]
+            } else {
+                points = [
+                    CGPoint(x: centerX - pieceWidth * 0.42, y: centerY - pieceHeight * 0.50),
+                    CGPoint(x: centerX + pieceWidth * 0.38, y: centerY - pieceHeight * 0.32),
+                    CGPoint(x: centerX + pieceWidth * 0.50, y: centerY + pieceHeight * 0.22),
+                    CGPoint(x: centerX - pieceWidth * 0.04, y: centerY + pieceHeight * 0.50),
+                    CGPoint(x: centerX - pieceWidth * 0.50, y: centerY + pieceHeight * 0.08)
+                ]
+            }
+            return CamoPiece(
+                id: index,
+                points: points,
+                color: colors[index % colors.count],
+                opacity: rng.nextCGFloat(in: 0.10...0.32)
+            )
+        }
+    }
+}
+
+private struct CamoPiece: Identifiable {
+    let id: Int
+    let points: [CGPoint]
+    let color: Color
+    let opacity: CGFloat
+}
+
+private struct SeededRandom {
+    private var state: UInt64
+
+    init(seed: UInt64) {
+        self.state = seed == 0 ? 1 : seed
+    }
+
+    mutating func nextCGFloat(in range: ClosedRange<CGFloat>) -> CGFloat {
+        state = 6364136223846793005 &* state &+ 1442695040888963407
+        let unit = CGFloat(Double(state >> 11) / Double(UInt64.max >> 11))
+        return range.lowerBound + unit * (range.upperBound - range.lowerBound)
+    }
+
+    mutating func nextBool() -> Bool {
+        nextCGFloat(in: 0...1) > 0.5
     }
 }
 
